@@ -1,15 +1,6 @@
 # install libraries
 import matplotlib.pyplot as plt
 import numpy as np
-import doe_dap_dl
-
-from doe_dap_dl import DAP
-
-wdh = DAP('wdh.energy.gov')
-
-wdh.setup_basic_auth()
-
-wdh.download_orders(order_ids=["e2491c36046b4b43acf6a2eab"]) 
 
 
 
