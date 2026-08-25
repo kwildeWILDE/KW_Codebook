@@ -98,7 +98,12 @@ plt.yticks(fontsize=10)
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.legend(fontsize=10)
-plt.show()
+#plt.show()
 
 #saving the wind speed plot to a folder
+output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+output_path = f"{output_folder}/AUG23_24_M2_WINDSP.png"
 
+# Save the plot
+plt.savefig(output_path, dpi=300, bbox_inches='tight')
+print(f"Plot saved to: {output_path}")
