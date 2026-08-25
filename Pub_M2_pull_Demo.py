@@ -134,13 +134,15 @@ heights = [2, 5, 10, 20, 50, 80]
 colors = ['blue', 'orange', 'green', 'red', 'purple', 'pink']
 
 #to prevent clutter
-skip= 6
+skip= 12
+
+plt.figure(figsize=(14,8))
 
 #associating the heights with their colors 
 for height, color in zip(heights, colors):
     wind_dir_col =f'Avg Wind Direction @ {height}m [deg]' #get the column name for the current height
     wind_dir_rad = np.deg2rad(df[wind_dir_col] + 180) #convert the wind direction to radians
-    vector_len = 1 #fixed length for all vectors
+    vector_len = 0.25 #fixed length for all vectors
     u = vector_len * np.sin(wind_dir_rad) #calculate the u  (east-west) component of the wind vector
     v = vector_len * np.cos(wind_dir_rad) #calculate the v (north-south) component of the wind vector
 
@@ -151,7 +153,7 @@ for height, color in zip(heights, colors):
         u[::skip],  # u-component (east-west) of the wind vector
         v[::skip],  # v-component (north-south) of the wind vector
         color=color,  # color for the wind vectors
-        scale=1,  # scale for the wind vectors
+        scale=0.5,  # scale for the wind vectors
         width=0.003,  # width of the wind vectors
         headwidth=3,  # width of the arrowhead
         headlength=4,  # length of the arrowhead
@@ -166,6 +168,13 @@ plt.yticks(heights, fontsize=10)  # Set y-ticks to the heights
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend(title='Height', fontsize=10)
 
+plt.tight_layout()
 plt.show()
 
-#yikes 
+#saving wind direction plot to a folder
+output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+output_path = f"{output_folder}/AUG23_24_M2_WINDDIR.png"
+
+# Save the plot
+plt.savefig(output_path, dpi=300, bbox_inches='tight')
+print(f"Plot saved to: {output_path}")
