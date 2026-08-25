@@ -283,11 +283,11 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend(title='Height', fontsize=10)
 
 plt.tight_layout()
-plt.show()
+#plt.show()
 
 #saving the plot of turbulence intensity to a folder
 output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
-output_path = f"{output_folder}/AUG23_24_M2_TURBULENCE_INTENSITY.png"
+output_path = f"{output_folder}/AUG23_24_M2_TURB_INTEN.png"
 
 # Save the plot
 plt.savefig(output_path, dpi=300, bbox_inches='tight')
