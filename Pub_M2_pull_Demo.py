@@ -128,7 +128,7 @@ colors = ['blue', 'orange', 'green', 'red', 'purple', 'pink']
 #to prevent clutter from too many arrows
 skip = 12
 
-plt.figure(figsize=(14,8))
+#plt.figure(figsize=(14,8))
 
 #associate each height with its color
 # for height, color in zip(heights, colors):
