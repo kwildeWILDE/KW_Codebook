@@ -101,9 +101,69 @@ plt.legend(fontsize=10)
 #plt.show()
 
 #saving the wind speed plot to a folder
-output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
-output_path = f"{output_folder}/AUG23_24_M2_WINDSP.png"
+#output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+#output_path = f"{output_folder}/AUG23_24_M2_WINDSP.png"
 
 # Save the plot
-plt.savefig(output_path, dpi=300, bbox_inches='tight')
-print(f"Plot saved to: {output_path}")
+#plt.savefig(output_path, dpi=300, bbox_inches='tight')
+#print(f"Plot saved to: {output_path}")
+
+#"-----------------------------------------------------------------------------------------------------------------------"#
+
+#plotting wind direction over time at the different heights [deg]
+
+#avg_wd2 = ds['Avg Wind Direction @ 2m [deg]']
+#avg_wd5 = ds['Avg Wind Direction @ 5m [deg]']
+#avg_wd10 = ds['Avg Wind Direction @ 10m [deg]']
+#avg_wd20 = ds['Avg Wind Direction @ 20m [deg]']
+#avg_wd50 = ds['Avg Wind Direction @ 50m [deg]']
+#avg_wd80 = ds['Avg Wind Direction @ 80m [deg]']
+
+#convert wind direction to radians for plotting
+#avg_wd2_rad = np.radians(avg_wd2)
+#avg_wd5_rad = np.radians(avg_wd5)
+#avg_wd10_rad = np.radians(avg_wd10)
+#avg_wd20_rad = np.radians(avg_wd20)
+#avg_wd50_rad = np.radians(avg_wd50)
+#avg_wd80_rad = np.radians(avg_wd80)
+
+#get the heights for the wind direction plot [meters]
+heights = [2, 5, 10, 20, 50, 80]
+
+#colors for each height
+colors = ['blue', 'orange', 'green', 'red', 'purple', 'pink']
+
+#to prevent clutter
+skip= 6
+
+#associating the heights with their colors 
+for heights, colors in zip(heights, colors):
+    wind_dir_col =f'Avg Wind Direction @ {heights}m [deg]' #get the column name for the current height
+    wind_dir_rad = np.deg2rad(df[wind_dir_col] + 180) #convert the wind direction to radians
+    vector_len = 1 #fixed length for all vectors
+    u = vector_len * np.sin(wind_dir_rad) #calculate the u  (east-west) component of the wind vector
+    v = vector_len * np.cos(wind_dir_rad) #calculate the v (north-south) component of the wind vector
+
+    #plot the wind directions through the quiver method 
+    plt.quiver(
+        df['datetime'][::skip],  # x-coordinates (time)
+        np.full_like(df['datetime'][::skip], heights),  # y-coordinates (height)
+        u[::skip],  # u-component (east-west) of the wind vector
+        v[::skip],  # v-component (north-south) of the wind vector
+        color=colors,  # color for the wind vectors
+        scale=1,  # scale for the wind vectors
+        width=0.003,  # width of the wind vectors
+        headwidth=3,  # width of the arrowhead
+        headlength=4,  # length of the arrowhead
+        label=f'{heights}m',
+    )
+
+plt.xlabel('Time', fontsize=12)
+plt.ylabel('Height (m)', fontsize=12)
+plt.title('Wind Direction Over Time at Different Heights', fontsize=14)
+plt.xticks(rotation=45, fontsize=10)
+plt.yticks(heights, fontsize=10)  # Set y-ticks to the heights
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.legend(title='Height', fontsize=10)
+
+plt.show()
