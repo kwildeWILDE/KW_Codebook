@@ -164,7 +164,7 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend(title='Height', fontsize=10)
 
 plt.tight_layout()
-plt.show()
+#plt.show()
 
 #saving wind direction plot to a folder
 output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
