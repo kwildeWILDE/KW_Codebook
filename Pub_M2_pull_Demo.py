@@ -241,7 +241,6 @@ plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.legend(fontsize=10)
 
-plt.show()
 
 #saving the wind shear exponent plot to a folder
 output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
