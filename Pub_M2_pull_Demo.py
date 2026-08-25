@@ -251,43 +251,167 @@ exp_56 = np.log(avg_ws80 / avg_ws50) / np.log(H6 / H5)
 
 # The workbook contains averaged wind speeds, so calculate a rolling estimate
 # of turbulence intensity from the variability between consecutive records.
-ti_window = 6  # six 30-minute records = a three-hour rolling window
+# ti_window = 6  # six 30-minute records = a three-hour rolling window
+
+# plt.figure(figsize=(14, 8))
+
+# for height, color in zip(heights, colors):
+# 	wind_speed_col = f'Avg Wind Speed @ {height}m [m/s]'
+# 	rolling_wind_speed = df[wind_speed_col].rolling(
+# 		window=ti_window,
+# 		min_periods=ti_window,
+# 	)
+# 	rolling_mean = rolling_wind_speed.mean()
+# 	rolling_std = rolling_wind_speed.std()
+# 	turbulence_intensity = rolling_std / rolling_mean.replace(0, np.nan)
+
+# 	plt.plot(
+# 		time,
+# 		turbulence_intensity,
+# 		color=color,
+# 		linewidth=1.5,
+# 		label=f'{height}m',
+# 	)
+
+# plt.xlabel('Time', fontsize=10)
+# plt.ylabel('Turbulence Intensity (sigma / mean)', fontsize=10)
+# plt.title('Turbulence Intensity Over Time at Different Heights', fontsize=10)
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+# plt.xticks(rotation=45, fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.7)
+# plt.legend(title='Height', fontsize=10)
+
+# plt.tight_layout()
+# plt.show()
+
+#saving the plot of turbulence intensity to a folder
+# output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+# output_path = f"{output_folder}/AUG23_24_M2_TURB_INTEN.png"
+
+# Save the plot
+# plt.savefig(output_path, dpi=300, bbox_inches='tight')
+# print(f"Plot saved to: {output_path}")
+
+
+#"-----------------------------------------------------------------------------------------------------------------------"#\
+
+# computing and plotting the bulk richardson number (Rb) at different heights and over time.
+#Rb = (g / T) * (dT/dz) / ((du/dz)^2 + (dv/dz)^2)
+
+heights = [2, 5, 10, 20, 50, 80]
+
+g = 9.81  # acceleration due to gravity in m/s^2
+
+# Calculate the bulk Richardson number between each adjacent measurement height.
+# Wind direction is converted to u/v components before calculating vertical shear.
+richardson_heights = [
+	height
+	for height in heights
+	if all(
+		column in df.columns
+		for column in (
+			f'Avg Wind Speed @ {height}m [m/s]',
+			f'Avg Wind Direction @ {height}m [deg]',
+		)
+	)
+]
+
+temperature_heights = [
+	height for height in heights if f'Temperature @ {height}m [deg C]' in df.columns
+]
+if len(richardson_heights) < 2 or len(temperature_heights) < 2:
+	raise ValueError('At least two heights with temperature and wind data are required for Rb.')
+
+# Interpolate temperatures at heights that are not directly measured so each
+# requested adjacent layer can be calculated.
+temperature_values = {}
+measured_temperature_values = df[
+	[f'Temperature @ {height}m [deg C]' for height in temperature_heights]
+]
+for height in heights:
+	if height in temperature_heights:
+		temperature_values[height] = df[f'Temperature @ {height}m [deg C]']
+	else:
+		temperature_values[height] = measured_temperature_values.apply(
+			lambda row: np.interp(
+				height,
+				temperature_heights,
+				row.to_numpy(dtype=float),
+			),
+			axis=1,
+		)
+
+wind_speed_columns = {
+	height: f'Avg Wind Speed @ {height}m [m/s]' for height in richardson_heights
+}
+wind_direction_columns = {
+	height: f'Avg Wind Direction @ {height}m [deg]' for height in richardson_heights
+}
+richardson_layers = [
+	(2, 5, 3.5),
+	(5, 10, 7.5),
+	(10, 20, 15),
+	(20, 50, 35),
+	(50, 80, 65),
+]
 
 plt.figure(figsize=(14, 8))
 
-for height, color in zip(heights, colors):
-	wind_speed_col = f'Avg Wind Speed @ {height}m [m/s]'
-	rolling_wind_speed = df[wind_speed_col].rolling(
-		window=ti_window,
-		min_periods=ti_window,
-	)
-	rolling_mean = rolling_wind_speed.mean()
-	rolling_std = rolling_wind_speed.std()
-	turbulence_intensity = rolling_std / rolling_mean.replace(0, np.nan)
+for (lower_height, upper_height, representative_height), color in zip(
+	richardson_layers, colors
+):
+	layer_thickness = upper_height - lower_height
+
+	lower_speed = df[wind_speed_columns[lower_height]]
+	upper_speed = df[wind_speed_columns[upper_height]]
+	lower_direction = np.deg2rad(df[wind_direction_columns[lower_height]] + 180)
+	upper_direction = np.deg2rad(df[wind_direction_columns[upper_height]] + 180)
+
+	lower_u = lower_speed * np.sin(lower_direction)
+	upper_u = upper_speed * np.sin(upper_direction)
+	lower_v = lower_speed * np.cos(lower_direction)
+	upper_v = upper_speed * np.cos(upper_direction)
+
+	temperature_kelvin = (
+		temperature_values[lower_height]
+		+ temperature_values[upper_height]
+	) / 2 + 273.15
+	temperature_gradient = (
+	temperature_values[upper_height]
+		- temperature_values[lower_height]
+	) / layer_thickness
+	u_gradient = (upper_u - lower_u) / layer_thickness
+	v_gradient = (upper_v - lower_v) / layer_thickness
+	shear_squared = u_gradient**2 + v_gradient**2
+
+	richardson_number = (
+		(g / temperature_kelvin) * temperature_gradient
+	) / shear_squared.replace(0, np.nan)
 
 	plt.plot(
 		time,
-		turbulence_intensity,
+		richardson_number,
 		color=color,
 		linewidth=1.5,
-		label=f'{height}m',
+		label=f'{lower_height}-{upper_height}m (representative {representative_height}m)',
 	)
 
 plt.xlabel('Time', fontsize=10)
-plt.ylabel('Turbulence Intensity (sigma / mean)', fontsize=10)
-plt.title('Turbulence Intensity Over Time at Different Heights', fontsize=10)
+plt.ylabel('Bulk Richardson Number (Rb)', fontsize=10)
+plt.title('Bulk Richardson Number Over Time', fontsize=10)
 plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
 plt.xticks(rotation=45, fontsize=10)
 plt.grid(True, linestyle='--', alpha=0.7)
-plt.legend(title='Height', fontsize=10)
+plt.legend(title='Height Layer', fontsize=10)
 
 plt.tight_layout()
-#plt.show()
+plt.show()
 
-#saving the plot of turbulence intensity to a folder
+#saving the plot of bulk richardson number to a folder
 output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
-output_path = f"{output_folder}/AUG23_24_M2_TURB_INTEN.png"
+output_path = f"{output_folder}/AUG23_24_M2_BULK_RICHARDSON.png"
 
 # Save the plot
 plt.savefig(output_path, dpi=300, bbox_inches='tight')
