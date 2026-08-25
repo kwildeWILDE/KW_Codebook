@@ -131,48 +131,48 @@ skip = 12
 plt.figure(figsize=(14,8))
 
 #associate each height with its color
-for height, color in zip(heights, colors):
-    wind_dir_col = f'Avg Wind Direction @ {height}m [deg]'
-    wind_direction_rad = np.deg2rad(df[wind_dir_col] + 180)
-    u = np.sin(wind_direction_rad)
-    v = np.cos(wind_direction_rad)
-    plt.quiver(
-        df['datetime'][::skip],
-        np.full(len(df['datetime'][::skip]), height, dtype=float),
-        u[::skip],
-        v[::skip],
-        color=color,
-        angles='uv',
-        scale_units='width',
-        scale=35,
-        width=0.0025,
-        headwidth=3,
-        headlength=4,
-        pivot='mid',
-        label=f'{height}m',
-    )
+# for height, color in zip(heights, colors):
+#     wind_dir_col = f'Avg Wind Direction @ {height}m [deg]'
+#     wind_direction_rad = np.deg2rad(df[wind_dir_col] + 180)
+#     u = np.sin(wind_direction_rad)
+#     v = np.cos(wind_direction_rad)
+#     plt.quiver(
+#         df['datetime'][::skip],
+#         np.full(len(df['datetime'][::skip]), height, dtype=float),
+#         u[::skip],
+#         v[::skip],
+#         color=color,
+#         angles='uv',
+#         scale_units='width',
+#         scale=35,
+#         width=0.0025,
+#         headwidth=3,
+#         headlength=4,
+#         pivot='mid',
+#         label=f'{height}m',
+#     )
 
-plt.xlabel('Time', fontsize=10)
-plt.ylabel('Measurement Height (m)', fontsize=10)
-plt.title('Wind Direction Over Time at Different Heights', fontsize=10)
-plt.ylim(0, 85)
-plt.yticks(heights, fontsize=10)
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-plt.xticks(rotation=45, fontsize=10)
-plt.grid(True, linestyle='--', alpha=0.7)
-plt.legend(title='Height', fontsize=10)
+# plt.xlabel('Time', fontsize=10)
+# plt.ylabel('Measurement Height (m)', fontsize=10)
+# plt.title('Wind Direction Over Time at Different Heights', fontsize=10)
+# plt.ylim(0, 85)
+# plt.yticks(heights, fontsize=10)
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+# plt.xticks(rotation=45, fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.7)
+# plt.legend(title='Height', fontsize=10)
 
-plt.tight_layout()
+# plt.tight_layout()
 #plt.show()
 
 #saving wind direction plot to a folder
-output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
-output_path = f"{output_folder}/AUG23_24_M2_WINDDIR.png"
+# output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+# output_path = f"{output_folder}/AUG23_24_M2_WINDDIR.png"
 
 # Save the plot
-plt.savefig(output_path, dpi=300, bbox_inches='tight')
-print(f"Plot saved to: {output_path}")
+# plt.savefig(output_path, dpi=300, bbox_inches='tight')
+# print(f"Plot saved to: {output_path}")
 
 
 #"-----------------------------------------------------------------------------------------------------------------------"#
@@ -249,3 +249,46 @@ exp_56 = np.log(avg_ws80 / avg_ws50) / np.log(H6 / H5)
 
 #TI = V_std / V_avg --> turbulence intensity is the ratio of the standard deviation of the wind speed to the average wind speed at a given height.
 
+# The workbook contains averaged wind speeds, so calculate a rolling estimate
+# of turbulence intensity from the variability between consecutive records.
+ti_window = 6  # six 30-minute records = a three-hour rolling window
+
+plt.figure(figsize=(14, 8))
+
+for height, color in zip(heights, colors):
+	wind_speed_col = f'Avg Wind Speed @ {height}m [m/s]'
+	rolling_wind_speed = df[wind_speed_col].rolling(
+		window=ti_window,
+		min_periods=ti_window,
+	)
+	rolling_mean = rolling_wind_speed.mean()
+	rolling_std = rolling_wind_speed.std()
+	turbulence_intensity = rolling_std / rolling_mean.replace(0, np.nan)
+
+	plt.plot(
+		time,
+		turbulence_intensity,
+		color=color,
+		linewidth=1.5,
+		label=f'{height}m',
+	)
+
+plt.xlabel('Time', fontsize=10)
+plt.ylabel('Turbulence Intensity (sigma / mean)', fontsize=10)
+plt.title('Turbulence Intensity Over Time at Different Heights', fontsize=10)
+plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+plt.xticks(rotation=45, fontsize=10)
+plt.grid(True, linestyle='--', alpha=0.7)
+plt.legend(title='Height', fontsize=10)
+
+plt.tight_layout()
+plt.show()
+
+#saving the plot of turbulence intensity to a folder
+output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+output_path = f"{output_folder}/AUG23_24_M2_TURBULENCE_INTENSITY.png"
+
+# Save the plot
+plt.savefig(output_path, dpi=300, bbox_inches='tight')
+print(f"Plot saved to: {output_path}")
