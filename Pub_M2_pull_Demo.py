@@ -37,23 +37,23 @@ df['datetime'] = pd.to_datetime(df['DATE (MM/DD/YYYY)'].astype(str) + ' ' + df['
 time = df['datetime']
 
 
-plt.figure(figsize=(12, 6))
-plt.plot(time, temp2, label='Temperature @ 2m [deg C]', color='blue')
-plt.plot(time, temp50, label='Temperature @ 50m [deg C]', color='green')
-plt.plot(time, temp80, label='Temperature @ 80m [deg C]', color='red')
+#plt.figure(figsize=(12, 6))
+#plt.plot(time, temp2, label='Temperature @ 2m [deg C]', color='blue')
+#plt.plot(time, temp50, label='Temperature @ 50m [deg C]', color='green')
+#plt.plot(time, temp80, label='Temperature @ 80m [deg C]', color='red')
 
 #setting up the x-axis to show time in a readable format
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+#plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
+#plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
 
-plt.xlabel('Time')
-plt.ylabel('Temperature [Deg C]')
-plt.title('Temperature Over Time ')
-plt.xticks(rotation=45, fontsize=10)
-plt.yticks(fontsize=10)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.legend(fontsize=10)
+#plt.xlabel('Time')
+#plt.ylabel('Temperature [Deg C]')
+#plt.title('Temperature Over Time ')
+#plt.xticks(rotation=45, fontsize=10)
+#plt.yticks(fontsize=10)
+#plt.grid(True, linestyle='--', alpha=0.5)
+#plt.tight_layout()
+#plt.legend(fontsize=10)
 #plt.show()
 
 #Save the plot to a folder
@@ -78,26 +78,26 @@ avg_ws20 = ds['Avg Wind Speed @ 20m [m/s]']
 avg_ws50 = ds['Avg Wind Speed @ 50m [m/s]']
 avg_ws80 = ds['Avg Wind Speed @ 80m [m/s]']
 
-plt.figure(figsize=(12, 6))
-plt.plot(time, avg_ws2, label='Avg Wind Speed @ 2m [m/s]', color='blue')
-plt.plot(time, avg_ws5, label='Avg Wind Speed @ 5m [m/s]', color='orange')
-plt.plot(time, avg_ws10, label='Avg Wind Speed @ 10m [m/s]', color='green')
-plt.plot(time, avg_ws20, label='Avg Wind Speed @ 20m [m/s]', color='red')
-plt.plot(time, avg_ws50, label='Avg Wind Speed @ 50m [m/s]', color='purple')
-plt.plot(time, avg_ws80, label='Avg Wind Speed @ 80m [m/s]', color='pink')
+#plt.figure(figsize=(12, 6))
+#plt.plot(time, avg_ws2, label='Avg Wind Speed @ 2m [m/s]', color='blue')
+#plt.plot(time, avg_ws5, label='Avg Wind Speed @ 5m [m/s]', color='orange')
+#plt.plot(time, avg_ws10, label='Avg Wind Speed @ 10m [m/s]', color='green')
+#plt.plot(time, avg_ws20, label='Avg Wind Speed @ 20m [m/s]', color='red')
+#plt.plot(time, avg_ws50, label='Avg Wind Speed @ 50m [m/s]', color='purple')
+#plt.plot(time, avg_ws80, label='Avg Wind Speed @ 80m [m/s]', color='pink')
 
 #setting up the x-axis to show time in a readable format
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+#plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
+#plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
 
-plt.xlabel('Time')
-plt.ylabel('Average Wind Speed [m/s]')
-plt.title('Wind Speed Over Time')
-plt.xticks(rotation=45, fontsize=10)
-plt.yticks(fontsize=10)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.legend(fontsize=10)
+#plt.xlabel('Time')
+#plt.ylabel('Average Wind Speed [m/s]')
+#plt.title('Wind Speed Over Time')
+#plt.xticks(rotation=45, fontsize=10)
+#plt.yticks(fontsize=10)
+#plt.grid(True, linestyle='--', alpha=0.5)
+#plt.tight_layout()
+#plt.legend(fontsize=10)
 #plt.show()
 
 #saving the wind speed plot to a folder
@@ -137,8 +137,8 @@ colors = ['blue', 'orange', 'green', 'red', 'purple', 'pink']
 skip= 6
 
 #associating the heights with their colors 
-for heights, colors in zip(heights, colors):
-    wind_dir_col =f'Avg Wind Direction @ {heights}m [deg]' #get the column name for the current height
+for height, color in zip(heights, colors):
+    wind_dir_col =f'Avg Wind Direction @ {height}m [deg]' #get the column name for the current height
     wind_dir_rad = np.deg2rad(df[wind_dir_col] + 180) #convert the wind direction to radians
     vector_len = 1 #fixed length for all vectors
     u = vector_len * np.sin(wind_dir_rad) #calculate the u  (east-west) component of the wind vector
@@ -147,23 +147,25 @@ for heights, colors in zip(heights, colors):
     #plot the wind directions through the quiver method 
     plt.quiver(
         df['datetime'][::skip],  # x-coordinates (time)
-        np.full_like(df['datetime'][::skip], heights),  # y-coordinates (height)
+        np.full_like(df['datetime'][::skip], height),  # y-coordinates (height)
         u[::skip],  # u-component (east-west) of the wind vector
         v[::skip],  # v-component (north-south) of the wind vector
-        color=colors,  # color for the wind vectors
+        color=color,  # color for the wind vectors
         scale=1,  # scale for the wind vectors
         width=0.003,  # width of the wind vectors
         headwidth=3,  # width of the arrowhead
         headlength=4,  # length of the arrowhead
-        label=f'{heights}m',
+        label=f'{height}m',
     )
 
-plt.xlabel('Time', fontsize=12)
-plt.ylabel('Height (m)', fontsize=12)
-plt.title('Wind Direction Over Time at Different Heights', fontsize=14)
+plt.xlabel('Time', fontsize=10)
+plt.ylabel('Height (m)', fontsize=10)
+plt.title('Wind Direction Over Time at Different Heights', fontsize=10)
 plt.xticks(rotation=45, fontsize=10)
 plt.yticks(heights, fontsize=10)  # Set y-ticks to the heights
 plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend(title='Height', fontsize=10)
 
 plt.show()
+
+#yikes 
