@@ -416,3 +416,5 @@ output_path = f"{output_folder}/AUG23_24_M2_BULK_RICHARDSON.png"
 # Save the plot
 plt.savefig(output_path, dpi=300, bbox_inches='tight')
 print(f"Plot saved to: {output_path}")
+
+#[Fix the plot to save on github properly] 
