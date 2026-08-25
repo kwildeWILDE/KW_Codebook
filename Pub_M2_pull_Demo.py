@@ -139,36 +139,36 @@ skip= 12
 #plt.figure(figsize=(14,8))
 
 #associating the heights with their colors 
-for height, color in zip(heights, colors):
-    wind_dir_col =f'Avg Wind Direction @ {height}m [deg]' #get the column name for the current height
-    wind_dir_rad = np.deg2rad(df[wind_dir_col] + 180) #convert the wind direction to radians
-    vector_len = 0.25 #fixed length for all vectors
-    u = vector_len * np.sin(wind_dir_rad) #calculate the u  (east-west) component of the wind vector
-    v = vector_len * np.cos(wind_dir_rad) #calculate the v (north-south) component of the wind vector
+#for height, color in zip(heights, colors):
+    #wind_dir_col =f'Avg Wind Direction @ {height}m [deg]' #get the column name for the current height
+    #wind_dir_rad = np.deg2rad(df[wind_dir_col] + 180) #convert the wind direction to radians
+    #vector_len = 0.25 #fixed length for all vectors
+    #u = vector_len * np.sin(wind_dir_rad) #calculate the u  (east-west) component of the wind vector
+    #v = vector_len * np.cos(wind_dir_rad) #calculate the v (north-south) component of the wind vector
 
     #plot the wind directions through the quiver method 
-    plt.quiver(
-        df['datetime'][::skip],  # x-coordinates (time)
-        np.full_like(df['datetime'][::skip], height),  # y-coordinates (height)
-        u[::skip],  # u-component (east-west) of the wind vector
-        v[::skip],  # v-component (north-south) of the wind vector
-        color=color,  # color for the wind vectors
-        scale=0.5,  # scale for the wind vectors
-        width=0.003,  # width of the wind vectors
-        headwidth=3,  # width of the arrowhead
-        headlength=4,  # length of the arrowhead
-        label=f'{height}m',
-    )
+    #plt.quiver(
+        #df['datetime'][::skip],  # x-coordinates (time)
+        #np.full_like(df['datetime'][::skip], height),  # y-coordinates (height)
+        #u[::skip],  # u-component (east-west) of the wind vector
+        #v[::skip],  # v-component (north-south) of the wind vector
+        #color=color,  # color for the wind vectors
+        #scale=0.5,  # scale for the wind vectors
+        #width=0.003,  # width of the wind vectors
+        #headwidth=3,  # width of the arrowhead
+        #headlength=4,  # length of the arrowhead
+        #label=f'{height}m',
+    #)
 
-plt.xlabel('Time', fontsize=10)
-plt.ylabel('Height (m)', fontsize=10)
-plt.title('Wind Direction Over Time at Different Heights', fontsize=10)
-plt.xticks(rotation=45, fontsize=10)
-plt.yticks(heights, fontsize=10)  # Set y-ticks to the heights
-plt.grid(True, linestyle='--', alpha=0.7)
-plt.legend(title='Height', fontsize=10)
+#plt.xlabel('Time', fontsize=10)
+#plt.ylabel('Height (m)', fontsize=10)
+#plt.title('Wind Direction Over Time at Different Heights', fontsize=10)
+#plt.xticks(rotation=45, fontsize=10)
+#plt.yticks(heights, fontsize=10)  # Set y-ticks to the heights
+#plt.grid(True, linestyle='--', alpha=0.7)
+#plt.legend(title='Height', fontsize=10)
 
-plt.tight_layout()
+#plt.tight_layout()
 #plt.show()
 
 #[FIX LATER, PLOT IS LOOKING MESSY, NEED TO FIGURE OUT HOW TO MAKE THE WIND DIRECTION PLOT LOOK CLEANER]
