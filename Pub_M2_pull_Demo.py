@@ -294,7 +294,7 @@ exp_56 = np.log(avg_ws80 / avg_ws50) / np.log(H6 / H5)
 # print(f"Plot saved to: {output_path}")
 
 
-#"-----------------------------------------------------------------------------------------------------------------------"#\
+#"-----------------------------------------------------------------------------------------------------------------------"#
 
 # computing and plotting the bulk richardson number (Rb) at different heights and over time.
 #Rb = (g / T) * (dT/dz) / ((du/dz)^2 + (dv/dz)^2)
@@ -305,116 +305,219 @@ g = 9.81  # acceleration due to gravity in m/s^2
 
 # Calculate the bulk Richardson number between each adjacent measurement height.
 # Wind direction is converted to u/v components before calculating vertical shear.
-richardson_heights = [
-	height
-	for height in heights
-	if all(
-		column in df.columns
-		for column in (
-			f'Avg Wind Speed @ {height}m [m/s]',
-			f'Avg Wind Direction @ {height}m [deg]',
-		)
-	)
-]
+# richardson_heights = [
+# 	height
+# 	for height in heights
+# 	if all(
+# 		column in df.columns
+# 		for column in (
+# 			f'Avg Wind Speed @ {height}m [m/s]',
+# 			f'Avg Wind Direction @ {height}m [deg]',
+# 		)
+# 	)
+# ]
 
-temperature_heights = [
-	height for height in heights if f'Temperature @ {height}m [deg C]' in df.columns
-]
-if len(richardson_heights) < 2 or len(temperature_heights) < 2:
-	raise ValueError('At least two heights with temperature and wind data are required for Rb.')
+# temperature_heights = [
+# 	height for height in heights if f'Temperature @ {height}m [deg C]' in df.columns
+# ]
+# if len(richardson_heights) < 2 or len(temperature_heights) < 2:
+# 	raise ValueError('At least two heights with temperature and wind data are required for Rb.')
 
-# Interpolate temperatures at heights that are not directly measured so each
-# requested adjacent layer can be calculated.
-temperature_values = {}
-measured_temperature_values = df[
-	[f'Temperature @ {height}m [deg C]' for height in temperature_heights]
-]
-for height in heights:
-	if height in temperature_heights:
-		temperature_values[height] = df[f'Temperature @ {height}m [deg C]']
-	else:
-		temperature_values[height] = measured_temperature_values.apply(
-			lambda row: np.interp(
-				height,
-				temperature_heights,
-				row.to_numpy(dtype=float),
-			),
-			axis=1,
-		)
+# # Interpolate temperatures at heights that are not directly measured so each
+# # requested adjacent layer can be calculated.
+# temperature_values = {}
+# measured_temperature_values = df[
+# 	[f'Temperature @ {height}m [deg C]' for height in temperature_heights]
+# ]
+# for height in heights:
+# 	if height in temperature_heights:
+# 		temperature_values[height] = df[f'Temperature @ {height}m [deg C]']
+# 	else:
+# 		temperature_values[height] = measured_temperature_values.apply(
+# 			lambda row: np.interp(
+# 				height,
+# 				temperature_heights,
+# 				row.to_numpy(dtype=float),
+# 			),
+# 			axis=1,
+# 		)
 
-wind_speed_columns = {
-	height: f'Avg Wind Speed @ {height}m [m/s]' for height in richardson_heights
-}
-wind_direction_columns = {
-	height: f'Avg Wind Direction @ {height}m [deg]' for height in richardson_heights
-}
-richardson_layers = [
-	(2, 5, 3.5),
-	(5, 10, 7.5),
-	(10, 20, 15),
-	(20, 50, 35),
-	(50, 80, 65),
-]
+# wind_speed_columns = {
+# 	height: f'Avg Wind Speed @ {height}m [m/s]' for height in richardson_heights
+# }
+# wind_direction_columns = {
+# 	height: f'Avg Wind Direction @ {height}m [deg]' for height in richardson_heights
+# }
+# richardson_layers = [
+# 	(2, 5, 3.5),
+# 	(5, 10, 7.5),
+# 	(10, 20, 15),
+# 	(20, 50, 35),
+# 	(50, 80, 65),
+# ]
 
-plt.figure(figsize=(14, 8))
+# plt.figure(figsize=(14, 8))
 
-for (lower_height, upper_height, representative_height), color in zip(
-	richardson_layers, colors
-):
-	layer_thickness = upper_height - lower_height
+# for (lower_height, upper_height, representative_height), color in zip(
+# 	richardson_layers, colors
+# ):
+# 	layer_thickness = upper_height - lower_height
 
-	lower_speed = df[wind_speed_columns[lower_height]]
-	upper_speed = df[wind_speed_columns[upper_height]]
-	lower_direction = np.deg2rad(df[wind_direction_columns[lower_height]] + 180)
-	upper_direction = np.deg2rad(df[wind_direction_columns[upper_height]] + 180)
+# 	lower_speed = df[wind_speed_columns[lower_height]]
+# 	upper_speed = df[wind_speed_columns[upper_height]]
+# 	lower_direction = np.deg2rad(df[wind_direction_columns[lower_height]] + 180)
+# 	upper_direction = np.deg2rad(df[wind_direction_columns[upper_height]] + 180)
 
-	lower_u = lower_speed * np.sin(lower_direction)
-	upper_u = upper_speed * np.sin(upper_direction)
-	lower_v = lower_speed * np.cos(lower_direction)
-	upper_v = upper_speed * np.cos(upper_direction)
+# 	lower_u = lower_speed * np.sin(lower_direction)
+# 	upper_u = upper_speed * np.sin(upper_direction)
+# 	lower_v = lower_speed * np.cos(lower_direction)
+# 	upper_v = upper_speed * np.cos(upper_direction)
 
-	temperature_kelvin = (
-		temperature_values[lower_height]
-		+ temperature_values[upper_height]
-	) / 2 + 273.15
-	temperature_gradient = (
-	temperature_values[upper_height]
-		- temperature_values[lower_height]
-	) / layer_thickness
-	u_gradient = (upper_u - lower_u) / layer_thickness
-	v_gradient = (upper_v - lower_v) / layer_thickness
-	shear_squared = u_gradient**2 + v_gradient**2
+# 	temperature_kelvin = (
+# 		temperature_values[lower_height]
+# 		+ temperature_values[upper_height]
+# 	) / 2 + 273.15
+# 	temperature_gradient = (
+# 	temperature_values[upper_height]
+# 		- temperature_values[lower_height]
+# 	) / layer_thickness
+# 	u_gradient = (upper_u - lower_u) / layer_thickness
+# 	v_gradient = (upper_v - lower_v) / layer_thickness
+# 	shear_squared = u_gradient**2 + v_gradient**2
 
-	richardson_number = (
-		(g / temperature_kelvin) * temperature_gradient
-	) / shear_squared.replace(0, np.nan)
+# 	richardson_number = (
+# 		(g / temperature_kelvin) * temperature_gradient
+# 	) / shear_squared.replace(0, np.nan)
 
-	plt.plot(
-		time,
-		richardson_number,
-		color=color,
-		linewidth=1.5,
-		label=f'{lower_height}-{upper_height}m (representative {representative_height}m)',
-	)
+# 	plt.plot(
+# 		time,
+# 		richardson_number,
+# 		color=color,
+# 		linewidth=1.5,
+# 		label=f'{lower_height}-{upper_height}m (representative {representative_height}m)',
+# 	)
 
-plt.xlabel('Time', fontsize=10)
-plt.ylabel('Bulk Richardson Number (Rb)', fontsize=10)
-plt.title('Bulk Richardson Number Over Time', fontsize=10)
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
-plt.xticks(rotation=45, fontsize=10)
-plt.grid(True, linestyle='--', alpha=0.7)
-plt.legend(title='Height Layer', fontsize=10)
+# plt.xlabel('Time', fontsize=10)
+# plt.ylabel('Bulk Richardson Number (Rb)', fontsize=10)
+# plt.title('Bulk Richardson Number Over Time', fontsize=10)
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=6))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%m/%d %H:%M'))
+# plt.xticks(rotation=45, fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.7)
+# plt.legend(title='Height Layer', fontsize=10)
 
-plt.tight_layout()
+# plt.tight_layout()
 #plt.show()
 
 #saving the plot of bulk richardson number to a folder
-output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
-output_path = f"{output_folder}/AUG23_24_M2_BULK_RICHARDSON.png"
+# output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+# output_path = f"{output_folder}/AUG23_24_M2_BULK_RICHARDSON.png"
 
 # Save the plot
-plt.savefig(output_path, dpi=300, bbox_inches='tight')
+# plt.savefig(output_path, dpi=300, bbox_inches='tight')
+# print(f"Plot saved to: {output_path}")
+
+#"-----------------------------------------------------------------------------------------------------------------------"#
+
+#Plotting the diurnal cycles of wind shear and turbulence itensity at different heights.
+## Plottingthe transitions between the convective (daytime) and stable (nighttime) boundary layer conditions.
+
+wind_speed_columns = {
+	height: f'Avg Wind Speed @ {height}m [m/s]'
+	for height in heights
+}
+shear_layers = list(zip(heights[:-1], heights[1:]))
+
+# Use the same three-hour rolling estimate as the turbulence-intensity plot above.
+ti_window = 6
+diurnal_data = pd.DataFrame({'time': time})
+diurnal_data['time_of_day'] = diurnal_data['time'].dt.hour
+
+for height, wind_speed_column in wind_speed_columns.items():
+	rolling_wind_speed = df[wind_speed_column].rolling(
+		window=ti_window,
+		min_periods=ti_window,
+	)
+	diurnal_data[f'ti_{height}m'] = (
+	rolling_wind_speed.std()
+		/ rolling_wind_speed.mean().replace(0, np.nan)
+	)
+
+for lower_height, upper_height in shear_layers:
+	lower_speed = df[wind_speed_columns[lower_height]].where(lambda values: values > 0)
+	upper_speed = df[wind_speed_columns[upper_height]].where(lambda values: values > 0)
+	diurnal_data[f'shear_{lower_height}_{upper_height}m'] = np.log(
+		upper_speed / lower_speed
+	) / np.log(upper_height / lower_height)
+
+diurnal_cycle = diurnal_data.groupby('time_of_day').mean(numeric_only=True)
+
+fig, (shear_axis, ti_axis) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+
+# Sunrise and sunset for the measurement period, expressed as MST decimal hours.
+sunrise_hour = 6.25
+sunset_hour = 19.75
+
+for axis in (shear_axis, ti_axis):
+	axis.axvspan(0, sunrise_hour, color='slategray', alpha=0.12)
+	axis.axvspan(sunset_hour, 24, color='slategray', alpha=0.12)
+	axis.axvline(
+		sunrise_hour,
+		color='darkorange',
+		linestyle='--',
+		linewidth=1.5,
+		label='Sunrise (06:15 MST)',
+	)
+	axis.axvline(
+		sunset_hour,
+		color='navy',
+		linestyle='--',
+		linewidth=1.5,
+		label='Sunset (19:45 MST)',
+	)
+
+for (lower_height, upper_height), color in zip(shear_layers, colors[:-1]):
+	shear_axis.plot(
+		diurnal_cycle.index,
+		diurnal_cycle[f'shear_{lower_height}_{upper_height}m'],
+		color=color,
+		linewidth=1.5,
+		label=f'{lower_height}-{upper_height}m',
+	)
+
+shear_axis.axhline(xl, color='cyan', linestyle='--', linewidth=1, label='0.21, very unstable')
+shear_axis.axhline(xu, color='magenta', linestyle='--', linewidth=1, label='0.40, very stable')
+shear_axis.set_ylabel('Wind Shear Exponent')
+shear_axis.set_title('Diurnal Cycle of Wind Shear and Turbulence Intensity')
+shear_axis.grid(True, linestyle='--', alpha=0.5)
+shear_axis.legend(title='Shear layer / daylight transition', fontsize=9, ncol=2)
+
+for height, color in zip(heights, colors):
+	ti_axis.plot(
+		diurnal_cycle.index,
+		diurnal_cycle[f'ti_{height}m'],
+		color=color,
+		linewidth=1.5,
+		label=f'{height}m',
+	)
+
+ti_axis.set_xlabel('Hour of day (MST)')
+ti_axis.set_ylabel('Turbulence Intensity (sigma / mean)')
+ti_axis.set_xlim(0, 24)
+ti_axis.set_xticks(range(0, 25, 2))
+ti_axis.grid(True, linestyle='--', alpha=0.5)
+ti_axis.legend(title='Height / daylight transition', fontsize=9, ncol=3)
+
+fig.tight_layout()
+plt.show()
+
+
+output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+os.makedirs(output_folder, exist_ok=True)
+output_path = f"{output_folder}/AUG23_24_M2_DIURNAL_SHEAR_TURBULENCE.png"
+fig.savefig(output_path, dpi=300, bbox_inches='tight')
 print(f"Plot saved to: {output_path}")
 
-#[Fix the plot to save on github properly]  
+
+
+
