@@ -407,7 +407,7 @@ plt.grid(True, linestyle='--', alpha=0.7)
 plt.legend(title='Height Layer', fontsize=10)
 
 plt.tight_layout()
-plt.show()
+#plt.show()
 
 #saving the plot of bulk richardson number to a folder
 output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
@@ -417,4 +417,4 @@ output_path = f"{output_folder}/AUG23_24_M2_BULK_RICHARDSON.png"
 plt.savefig(output_path, dpi=300, bbox_inches='tight')
 print(f"Plot saved to: {output_path}")
 
-#[Fix the plot to save on github properly] 
+#[Fix the plot to save on github properly]  
