@@ -178,7 +178,7 @@ skip = 12
 #"-----------------------------------------------------------------------------------------------------------------------"#
 
 #Compute the wind shear exponent (power law)
-# Vu = Vl * (HU/HL) ^ (exp)
+#Vu = Vl * (HU/HL) ^ (exp)
 ## Where: 
 ## Vu = wind speed at upper height (m/s)
 ## Vl = wind speed at lower height (m/s)
@@ -186,12 +186,14 @@ skip = 12
 ## HL = lower height (m)
 ## the exponent (exp) is the wind shear exponent
 
+ #exp = log(Vu/Vl) / log(HU/HL)
+
 ### exp < 0.21 = (very-modertly unstable) 
 ### 0.21 < exp < 0.25 = near nuetral
 ### 0.25 < exp < 0.4 = moderately stable
 ### 0.4 < exp = very stable
 
-# exp = log(Vu/Vl) / log(HU/HL)
+
 
 xl = 0.21 #NEAR UNSTABLE VALUE
 xu = 0.4 #NEAR STABLE VALUE
@@ -247,7 +249,9 @@ exp_56 = np.log(avg_ws80 / avg_ws50) / np.log(H6 / H5)
 
 #calculating and plotting the turbulence intensity at different heights and over time. 
 
-#TI = V_std / V_avg --> turbulence intensity is the ratio of the standard deviation of the wind speed to the average wind speed at a given height.
+# ##turbulence intensity is the ratio of the standard deviation of the wind speed to the average wind speed at a given height.
+
+#TI = V_std / V_avg 
 
 # The workbook contains averaged wind speeds, so calculate a rolling estimate
 # of turbulence intensity from the variability between consecutive records.
@@ -422,156 +426,183 @@ g = 9.81  # acceleration due to gravity in m/s^2
 #Plotting the diurnal cycles of wind shear and turbulence itensity at different heights.
 ## Plottingthe transitions between the convective (daytime) and stable (nighttime) boundary layer conditions.
 
-# wind_speed_columns = {
-# 	height: f'Avg Wind Speed @ {height}m [m/s]'
-# 	for height in heights
-# }
-# shear_layers = list(zip(heights[:-1], heights[1:]))
+wind_speed_columns = {
+	height: f'Avg Wind Speed @ {height}m [m/s]'
+	for height in heights
+}
+shear_layers = list(zip(heights[:-1], heights[1:]))
 
-# Use the same three-hour rolling estimate as the turbulence-intensity plot above.
-# ti_window = 6
-# diurnal_data = pd.DataFrame({'time': time})
-# diurnal_data['time_of_day'] = diurnal_data['time'].dt.hour
+# Calculate turbulence intensity from a three-hour rolling estimate.
+ti_window = 6
+diurnal_data = pd.DataFrame({'time': time})
 
-# for height, wind_speed_column in wind_speed_columns.items():
-# 	rolling_wind_speed = df[wind_speed_column].rolling(
-# 		window=ti_window,
-# 		min_periods=ti_window,
-# 	)
-# 	diurnal_data[f'ti_{height}m'] = (
-# 	rolling_wind_speed.std()
-# 		/ rolling_wind_speed.mean().replace(0, np.nan)
-# 	)
+for height, wind_speed_column in wind_speed_columns.items():
+	rolling_wind_speed = df[wind_speed_column].rolling(
+		window=ti_window,
+		min_periods=ti_window,
+	)
+	diurnal_data[f'ti_{height}m'] = (
+	rolling_wind_speed.std()
+		/ rolling_wind_speed.mean().replace(0, np.nan)
+	)
 
-# for lower_height, upper_height in shear_layers:
-# 	lower_speed = df[wind_speed_columns[lower_height]].where(lambda values: values > 0)
-# 	upper_speed = df[wind_speed_columns[upper_height]].where(lambda values: values > 0)
-# 	diurnal_data[f'shear_{lower_height}_{upper_height}m'] = np.log(
-# 		upper_speed / lower_speed
-# 	) / np.log(upper_height / lower_height)
+for lower_height, upper_height in shear_layers:
+	lower_speed = df[wind_speed_columns[lower_height]].where(lambda values: values > 0)
+	upper_speed = df[wind_speed_columns[upper_height]].where(lambda values: values > 0)
+	diurnal_data[f'shear_{lower_height}_{upper_height}m'] = np.log(
+		upper_speed / lower_speed
+	) / np.log(upper_height / lower_height)
 
-# diurnal_cycle = diurnal_data.groupby('time_of_day').mean(numeric_only=True)
+plot_start = pd.Timestamp('2026-08-23 00:00:00')
+plot_end = pd.Timestamp('2026-08-24 23:00:00')
+diurnal_data = diurnal_data.loc[
+	(diurnal_data['time'] >= plot_start)
+	& (diurnal_data['time'] <= plot_end)
+]
 
-# fig, (shear_axis, ti_axis) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
+diurnal_data = diurnal_data.set_index('time').sort_index()
+diurnal_data = diurnal_data.rolling('30min', min_periods=1).mean()
 
-# Sunrise and sunset for the measurement period, expressed as MST decimal hours.
-sunrise_hour = 6.25
-sunset_hour = 19.75
+fig, (shear_axis, ti_axis) = plt.subplots(2, 1, figsize=(14, 10), sharex=True)
 
-# for axis in (shear_axis, ti_axis):
-# 	axis.axvspan(0, sunrise_hour, color='slategray', alpha=0.12)
-# 	axis.axvspan(sunset_hour, 24, color='slategray', alpha=0.12)
-# 	axis.axvline(
-# 		sunrise_hour,
-# 		color='darkorange',
-# 		linestyle='--',
-# 		linewidth=1.5,
-# 		label='Sunrise (06:15 MST)',
-# 	)
-# 	axis.axvline(
-# 		sunset_hour,
-# 		color='navy',
-# 		linestyle='--',
-# 		linewidth=1.5,
-# 		label='Sunset (19:45 MST)',
-# 	)
+# Sunrise and sunset for each date, expressed as MST decimal hours.
+daylight_transitions = {
+	'2026-08-23': {
+		'sunrise': (6.25, '06:15', 'darkorange'),
+		'sunset': (19.75, '19:45', 'navy'),
+	},
+	'2026-08-24': {
+		'sunrise': (6 + 16 / 60, '06:16', 'goldenrod'),
+		'sunset': (19 + 44 / 60, '19:44', 'royalblue'),
+	},
+}
 
-# for (lower_height, upper_height), color in zip(shear_layers, colors[:-1]):
-# 	shear_axis.plot(
-# 		diurnal_cycle.index,
-# 		diurnal_cycle[f'shear_{lower_height}_{upper_height}m'],
-# 		color=color,
-# 		linewidth=1.5,
-# 		label=f'{lower_height}-{upper_height}m',
-# 	)
+for axis in (shear_axis, ti_axis):
+	for date_string, transitions in daylight_transitions.items():
+		date_label = pd.Timestamp(date_string).strftime('%b %d')
+		date_start = pd.Timestamp(date_string)
+		date_end = date_start + pd.Timedelta(hours=23)
+		sunrise_hour, sunrise_time, sunrise_color = transitions['sunrise']
+		sunset_hour, sunset_time, sunset_color = transitions['sunset']
+		sunrise_timestamp = date_start + pd.Timedelta(hours=sunrise_hour)
+		sunset_timestamp = date_start + pd.Timedelta(hours=sunset_hour)
+		axis.axvspan(date_start, sunrise_timestamp, color='slategray', alpha=0.06)
+		axis.axvspan(sunset_timestamp, date_end, color='slategray', alpha=0.06)
+		axis.axvline(
+			sunrise_timestamp,
+			color=sunrise_color,
+			linestyle='--',
+			linewidth=1.5,
+			label=f'{date_label} sunrise ({sunrise_time} MST)',
+		)
+		axis.axvline(
+			sunset_timestamp,
+			color=sunset_color,
+			linestyle='--',
+			linewidth=1.5,
+			label=f'{date_label} sunset ({sunset_time} MST)',
+		)
 
-# shear_axis.axhline(xl, color='cyan', linestyle='--', linewidth=1, label='0.21, very unstable')
-# shear_axis.axhline(xu, color='magenta', linestyle='--', linewidth=1, label='0.40, very stable')
-# shear_axis.set_ylabel('Wind Shear Exponent')
-# shear_axis.set_title('Diurnal Cycle of Wind Shear and Turbulence Intensity')
-# shear_axis.grid(True, linestyle='--', alpha=0.5)
-# shear_axis.legend(title='Shear layer / daylight transition', fontsize=9, ncol=2)
+for (lower_height, upper_height), color in zip(shear_layers, colors[:-1]):
+	shear_axis.plot(
+		diurnal_data.index,
+		diurnal_data[f'shear_{lower_height}_{upper_height}m'],
+		color=color,
+		linewidth=1.5,
+		label=f'{lower_height}-{upper_height}m',
+	)
 
-# for height, color in zip(heights, colors):
-# 	ti_axis.plot(
-# 		diurnal_cycle.index,
-# 		diurnal_cycle[f'ti_{height}m'],
-# 		color=color,
-# 		linewidth=1.5,
-# 		label=f'{height}m',
-# 	)
+shear_axis.axhline(xl, color='cyan', linestyle='--', linewidth=1, label='0.21, very unstable')
+shear_axis.axhline(xu, color='magenta', linestyle='--', linewidth=1, label='0.40, very stable')
+shear_axis.set_ylabel('Wind Shear Exponent')
+shear_axis.set_title('Diurnal Cycle of Wind Shear and Turbulence Intensity')
+shear_axis.grid(True, linestyle='--', alpha=0.5)
+shear_axis.legend(title='Shear layer / daylight transition', fontsize=9, ncol=2)
 
-# ti_axis.set_xlabel('Hour of day (MST)')
-# ti_axis.set_ylabel('Turbulence Intensity (sigma / mean)')
-# ti_axis.set_xlim(0, 24)
-# ti_axis.set_xticks(range(0, 25, 2))
-# ti_axis.grid(True, linestyle='--', alpha=0.5)
-# ti_axis.legend(title='Height / daylight transition', fontsize=9, ncol=3)
+for height, color in zip(heights, colors):
+	ti_axis.plot(
+		diurnal_data.index,
+		diurnal_data[f'ti_{height}m'],
+		color=color,
+		linewidth=1.5,
+		label=f'{height}m',
+	)
 
-# fig.tight_layout()
-# plt.show()
+ti_axis.set_xlabel('Date and hour (MST)')
+ti_axis.set_ylabel('Turbulence Intensity (sigma / mean)')
+ti_axis.set_xlim(plot_start, plot_end)
+axis_ticks = list(pd.date_range(plot_start, plot_end, freq='3h'))
+if axis_ticks[-1] != plot_end:
+	axis_ticks.append(plot_end)
+ti_axis.set_xticks(axis_ticks)
+ti_axis.xaxis.set_major_formatter(mdates.DateFormatter('%b %d\n%H:%M'))
+ti_axis.grid(True, linestyle='--', alpha=0.5)
+ti_axis.legend(title='Height / daylight transition', fontsize=9, ncol=3)
+
+fig.tight_layout()
+plt.show()
 
 
-# output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
-# os.makedirs(output_folder, exist_ok=True)
-# output_path = f"{output_folder}/AUG23_24_M2_DIURNAL_SHEAR_TURBULENCE.png"
-# fig.savefig(output_path, dpi=300, bbox_inches='tight')
-# print(f"Plot saved to: {output_path}")
+output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+os.makedirs(output_folder, exist_ok=True)
+output_path = f"{output_folder}/AUG23_24_M2_DIURNAL_SHEAR_TURBULENCE.png"
+fig.savefig(output_path, dpi=300, bbox_inches='tight')
+print(f"Plot saved to: {output_path}")
 
 #"-----------------------------------------------------------------------------------------------------------------------"#
 
 # Plotting wind speed profiles over height at four-hour intervals on August 23-24, 2026.
 
-profile_heights = [2, 5, 10, 20, 50, 80]
-profile_wind_speed_columns = {
-	height: f'Avg Wind Speed @ {height}m [m/s]'
-	for height in profile_heights
-}
+# profile_heights = [2, 5, 10, 20, 50, 80]
+# profile_wind_speed_columns = {
+# 	height: f'Avg Wind Speed @ {height}m [m/s]'
+# 	for height in profile_heights
+# }
 
-profile_times = [
-	pd.Timestamp(f'{date} {hour:02d}:00:00')
-	for date in ('2026-08-23', '2026-08-24')
-	for hour in range(0, 24, 4)
-]
+# profile_times = [
+# 	pd.Timestamp(f'{date} {hour:02d}:00:00')
+# 	for date in ('2026-08-23', '2026-08-24')
+# 	for hour in range(0, 24, 4)
+# ]
 
-fig, axis = plt.subplots(figsize=(10, 6))
+# fig, axis = plt.subplots(figsize=(10, 6))
 
-profile_colors = plt.cm.tab20(np.linspace(0, 1, len(profile_times)))
-for color, profile_time in zip(profile_colors, profile_times):
-	date_rows = df.loc[df['datetime'].dt.date == profile_time.date()]
-	if date_rows.empty:
-		raise ValueError(f'No wind-speed records found for {profile_time.date()}.')
+# profile_colors = plt.cm.tab20(np.linspace(0, 1, len(profile_times)))
+# for color, profile_time in zip(profile_colors, profile_times):
+# 	date_rows = df.loc[df['datetime'].dt.date == profile_time.date()]
+# 	if date_rows.empty:
+# 		raise ValueError(f'No wind-speed records found for {profile_time.date()}.')
 
-	closest_index = (date_rows['datetime'] - profile_time).abs().idxmin()
-	profile_row = df.loc[closest_index]
-	profile_wind_speeds = [
-		profile_row[profile_wind_speed_columns[height]]
-		for height in profile_heights
-	]
-	axis.plot(
-		profile_heights,
-		profile_wind_speeds,
-		color=color,
-		marker='o',
-		linewidth=1.8,
-		markersize=5,
-		label=profile_time.strftime('%b %d %H:%M MST'),
-	)
+# 	closest_index = (date_rows['datetime'] - profile_time).abs().idxmin()
+# 	profile_row = df.loc[closest_index]
+# 	profile_wind_speeds = [
+# 		profile_row[profile_wind_speed_columns[height]]
+# 		for height in profile_heights
+# 	]
+# 	axis.plot(
+# 		profile_heights,
+# 		profile_wind_speeds,
+# 		color=color,
+# 		marker='o',
+# 		linewidth=1.8,
+# 		markersize=5,
+# 		label=profile_time.strftime('%b %d %H:%M MST'),
+# 	)
 
-axis.set_xlabel('Height (m)')
-axis.set_ylabel('Average Wind Speed (m/s)')
-axis.set_title('Wind Speed Profiles Over Height at Four-Hour Intervals')
-axis.set_xticks(profile_heights)
-axis.grid(True, linestyle='--', alpha=0.5)
-axis.legend(title='Observation time', fontsize=9, ncol=2)
+# axis.set_xlabel('Height (m)')
+# axis.set_ylabel('Average Wind Speed (m/s)')
+# axis.set_title('Wind Speed Profiles Over Height at Four-Hour Intervals')
+# axis.set_xticks(profile_heights)
+# axis.grid(True, linestyle='--', alpha=0.5)
+# axis.legend(title='Observation time', fontsize=9, ncol=2)
 
-fig.tight_layout()
-output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
-os.makedirs(output_folder, exist_ok=True)
-output_path = f"{output_folder}/AUG23_24_2026_WIND_SPEED_PROFILES_4HR.png"
-fig.savefig(output_path, dpi=300, bbox_inches='tight')
-print(f"Plot saved to: {output_path}")
-plt.show()
+# fig.tight_layout()
+# output_folder = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/output_plots"
+# os.makedirs(output_folder, exist_ok=True)
+# output_path = f"{output_folder}/AUG23_24_2026_WIND_SPEED_PROFILES_4HR.png"
+# fig.savefig(output_path, dpi=300, bbox_inches='tight')
+# print(f"Plot saved to: {output_path}")
+# plt.show()
 
 
 
