@@ -25,17 +25,76 @@ target_dates = ['20240818', '20240819', '20240820', '20240821',
 print("Loading TROPoe dataset...")
 ds = load_tropoe_week(target_dates, verbose=True)
 
+# print("\n" + "=" * 70)
+# print("DATASET READY FOR ANALYSIS")
+# print("=" * 70)
+# print("\nAccess your data:")
+# print("  ds['temperature']              # Temperature profile")
+# print("  ds['waterVapor']               # Water vapor profile")
+# print("  ds['pressure']                 # Pressure profile")
+# print("  ds['qc_flag']                  # Quality control flags")
+# print("\nLoad into memory:")
+# print("  temp = ds['temperature'].compute()")
+# print("\nPlot data:")
+# print("  ds['temperature'].isel(height=27).plot()  # At ~8.5km")
+# print("=" * 70)
+
+#--------------------------------------------------------------# 
+# Understanding Height Indices
+# ============================================================================
 print("\n" + "=" * 70)
-print("DATASET READY FOR ANALYSIS")
-print("=" * 70)
-print("\nAccess your data:")
-print("  ds['temperature']              # Temperature profile")
-print("  ds['waterVapor']               # Water vapor profile")
-print("  ds['pressure']                 # Pressure profile")
-print("  ds['qc_flag']                  # Quality control flags")
-print("\nLoad into memory:")
-print("  temp = ds['temperature'].compute()")
-print("\nPlot data:")
-print("  ds['temperature'].isel(height=27).plot()  # At ~8.5km")
+print("HEIGHT INDEX REFERENCE")
 print("=" * 70)
 
+heights_km = ds['height'].values  # Height values in km
+
+# Create a DataFrame for easy viewing
+height_index_df = pd.DataFrame({
+    'Index': range(len(heights_km)),
+    'Height (km)': heights_km
+})
+
+print(height_index_df.to_string(index=False))
+
+# print("\n" + "=" * 70)
+# print("USAGE EXAMPLES:")
+# print("=" * 70)
+# print(f"\nTo access temperature at a specific height:")
+# print(f"  ds['temperature'].isel(height=0)   # Ground level (0.00 km)")
+# print(f"  ds['temperature'].isel(height=27)  # Upper troposphere ({heights_km[27]:.2f} km)")
+# print(f"  ds['temperature'].isel(height=-1)  # Max altitude ({heights_km[-1]:.2f} km)")
+
+# Example: Show temperature profile at first time step
+# print(f"\nTemperature at first time step (height profile):")
+# temp_profile = ds['temperature'].isel(time=0).values
+# for i, (height, temp) in enumerate(zip(heights_km, temp_profile)):
+#     print(f"  Index {i:2d} | Height {height:6.2f} km | Temp {temp:7.2f} C")
+
+print("\n" + "=" * 70)
+#creating a plot of temperature at a specific height across the week
+plt.figure(figsize=(10, 6))
+
+# Extract and plot temperature data at the different levels of the troposphere 
+temp_at_height_l = ds['temperature'].isel(height=27).values # (height index 27 = ~1.21 km)
+temp_at_height_m = ds['temperature'].isel(height=47).values # (height index 47 = ~8.72 km)
+temp_at_height_u = ds['temperature'].isel(height=54).values # (height index 54 = ~17.09 km)
+times = ds['time'].values
+
+plt.plot(times, temp_at_height_l, linewidth=2,color='blue', label='Lower Troposphere ~1.21 km')
+plt.plot(times, temp_at_height_m, linewidth=2, color='green', label='Middle Troposphere ~8.72 km')
+plt.plot(times, temp_at_height_u, linewidth=2, color='red', label='Upper Troposphere ~17.09 km')
+plt.xlabel('Time', fontsize=12)
+plt.ylabel('Temperature (°C)', fontsize=12)
+plt.title('Temperature Profile at Different Tropospheric Levels', fontsize=14)
+plt.grid(True, alpha=0.3)
+plt.xticks(rotation=45)
+plt.legend()
+plt.tight_layout()
+
+# Save plot to file
+output_path = 'output_plots/TROPoe_AUG1825_2024_plots/TROPoe_temperature_plot.png'
+os.makedirs('output_plots', exist_ok=True)
+plt.savefig(output_path, dpi=150)
+print(f"\n✓ Plot saved to: {output_path}")
+plt.close()  # Close the figure to free memory
+plt.show()  # Show the plot in an interactive window
