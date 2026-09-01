@@ -1,1 +1,23 @@
 #Import Liabraries
+import numpy as np
+import pandas as pd
+import xarray as xr 
+import matplotlib.pyplot as plt
+import os 
+from pathlib import Path
+
+print(xr.__version__)
+
+#upload the TROPoe data
+dp = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/TROPoe_Data_Pull"
+file_path = f"{dp}/order_1757a1568ad84dfda0f15b602"
+
+#uploading multiple .nc files into a single xarray dataset
+nc_files = [os.path.join(file_path, f) for f in os.listdir(file_path) if f.endswith('.nc')]
+
+#opening and combine all the .nc files into a single xarray dataset
+nc_ds = xr.open_mfdataset(nc_files, combine='by_coords')
+
+#display the dataset
+print(nc_ds.head())
+
