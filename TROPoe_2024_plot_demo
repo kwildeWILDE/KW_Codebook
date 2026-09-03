@@ -74,15 +74,21 @@ print("\n" + "=" * 70)
 #creating a plot of temperature at a specific height across the week
 plt.figure(figsize=(10, 6))
 
-# Extract and plot temperature data at the different levels of the troposphere 
+# Extract and plot temperature data at the different levels of the troposphere (with the respective qc flags)
 temp_at_height_l = ds['temperature'].isel(height=27).values # (height index 27 = ~1.21 km)
+# qc_at_height_l = ds['qc_flag'].isel(height=27).values # Quality control flags at ~1.21 km
 temp_at_height_m = ds['temperature'].isel(height=47).values # (height index 47 = ~8.72 km)
+# qc_at_height_m = ds['qc_flag'].isel(height=47).values # Quality control flags at ~8.72 km
 temp_at_height_u = ds['temperature'].isel(height=54).values # (height index 54 = ~17.09 km)
+# qc_at_height_u = ds['qc_flag'].isel(height=54).values # Quality control flags at ~17.09 km
 times = ds['time'].values
 
 plt.plot(times, temp_at_height_l, linewidth=2,color='blue', label='Lower Troposphere ~1.21 km')
+# plt.plot(times, qc_at_height_l, linewidth=1, color='cyan', linestyle='--', label='QC Flag ~1.21 km')
 plt.plot(times, temp_at_height_m, linewidth=2, color='green', label='Middle Troposphere ~8.72 km')
+# plt.plot(times, qc_at_height_m, linewidth=1, color='lime', linestyle='--', label='QC Flag ~8.72 km')
 plt.plot(times, temp_at_height_u, linewidth=2, color='red', label='Upper Troposphere ~17.09 km')
+# plt.plot(times, qc_at_height_u, linewidth=1, color='magenta', linestyle='--', label='QC Flag ~17.09 km')
 plt.xlabel('Time', fontsize=12)
 plt.ylabel('Temperature (°C)', fontsize=12)
 plt.title('Temperature Profile at Different Tropospheric Levels', fontsize=14)
