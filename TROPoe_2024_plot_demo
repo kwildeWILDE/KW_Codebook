@@ -56,6 +56,32 @@ height_index_df = pd.DataFrame({
 
 print(height_index_df.to_string(index=False))
 
+#understnading the values of the qc_flag variable
+print("\n" + "=" * 70)
+print("QC FLAG VALUES")
+print("=" * 70)
+
+qc_values = ds['qc_flag'].values
+print(ds['qc_flag'].head())  # Display the first few QC flag values
+print("Unique QC flag values:", np.unique(qc_values))  
+
+# Mapping QC flag values to their meanings
+qc_flag_meanings = {
+    0: "Good data",
+    1: "Suspect data",
+    2: "Bad data",
+    3: "Missing data"
+}  
+#plotting the qc_flag values to understand their distribution
+# plt.figure(figsize=(8, 5))
+# plt.hist(qc_values, bins=4, edgecolor='black', alpha=0.7)
+# plt.xlabel('QC Flag Value')
+# plt.ylabel('Frequency')
+# plt.title('Distribution of QC Flag Values')
+# plt.xticks(list(qc_flag_meanings.keys()), [qc_flag_meanings[k] for k in qc_flag_meanings.keys()])
+# plt.tight_layout()
+# plt.show()  # Show the plot in an interactive window
+
 # print("\n" + "=" * 70)
 # print("USAGE EXAMPLES:")
 # print("=" * 70)
@@ -72,35 +98,48 @@ print(height_index_df.to_string(index=False))
 
 print("\n" + "=" * 70)
 #creating a plot of temperature at a specific height across the week
-plt.figure(figsize=(10, 6))
 
-# Extract and plot temperature data at the different levels of the troposphere (with the respective qc flags)
+# Extract and plot temperature data at the different levels of the troposphere 
 temp_at_height_l = ds['temperature'].isel(height=27).values # (height index 27 = ~1.21 km)
-# qc_at_height_l = ds['qc_flag'].isel(height=27).values # Quality control flags at ~1.21 km
+
 temp_at_height_m = ds['temperature'].isel(height=47).values # (height index 47 = ~8.72 km)
-# qc_at_height_m = ds['qc_flag'].isel(height=47).values # Quality control flags at ~8.72 km
+
 temp_at_height_u = ds['temperature'].isel(height=54).values # (height index 54 = ~17.09 km)
-# qc_at_height_u = ds['qc_flag'].isel(height=54).values # Quality control flags at ~17.09 km
+
+#extracting and plotting the qc_flags over the time period for the different levels of the troposphere
+qc_ind_overall = ds['qc_flag']
+
 times = ds['time'].values
 
-plt.plot(times, temp_at_height_l, linewidth=2,color='blue', label='Lower Troposphere ~1.21 km')
-# plt.plot(times, qc_at_height_l, linewidth=1, color='cyan', linestyle='--', label='QC Flag ~1.21 km')
-plt.plot(times, temp_at_height_m, linewidth=2, color='green', label='Middle Troposphere ~8.72 km')
-# plt.plot(times, qc_at_height_m, linewidth=1, color='lime', linestyle='--', label='QC Flag ~8.72 km')
-plt.plot(times, temp_at_height_u, linewidth=2, color='red', label='Upper Troposphere ~17.09 km')
-# plt.plot(times, qc_at_height_u, linewidth=1, color='magenta', linestyle='--', label='QC Flag ~17.09 km')
-plt.xlabel('Time', fontsize=12)
-plt.ylabel('Temperature (°C)', fontsize=12)
+y1 = ds['temperature']
+y2 = ds['qc_flag']
+
+fig, ax1 = plt.subplots(figsize=(12, 6))
+
+ax1.plot(times, temp_at_height_l, linewidth=2,color='blue', label='Lower Troposphere ~1.21 km')
+
+ax1.plot(times, temp_at_height_m, linewidth=2, color='green', label='Middle Troposphere ~8.72 km')
+
+ax1.plot(times, temp_at_height_u, linewidth=2, color='red', label='Upper Troposphere ~17.09 km')
+
+ax1.set_xlabel('Time', fontsize=12)
+ax1.set_ylabel('Temperature (°C)', fontsize=12)
+ax1.legend(loc='upper right', fontsize=10)
+
+ax2 = ax1.twinx()  # Create a second y-axis for QC flags
+ax2.plot(times, qc_ind_overall, linewidth=1, color='orange', label='QC Flag', alpha=0.5)
+ax2.set_ylabel('QC Flag', fontsize=12)
+
+ax2.legend(loc='upper left', fontsize=10)
 plt.title('Temperature Profile at Different Tropospheric Levels', fontsize=14)
 plt.grid(True, alpha=0.3)
 plt.xticks(rotation=45)
-plt.legend()
+
 plt.tight_layout()
 
 # Save plot to file
 output_path = 'output_plots/TROPoe_AUG1825_2024_plots/TROPoe_temperature_plot.png'
-os.makedirs('output_plots', exist_ok=True)
+#os.makedirs('output_plots', exist_ok=True)
 plt.savefig(output_path, dpi=150)
 print(f"\n✓ Plot saved to: {output_path}")
-plt.close()  # Close the figure to free memory
 plt.show()  # Show the plot in an interactive window
