@@ -40,12 +40,15 @@ print("Dimensions:", dict(ds.sizes))
 print("Max Wind Speed:", ds["WS"].max().values)
 print("Min Wind Speed:", ds["WS"].min().values)  # Print wind speed values for verification
 
+#getting the wind speed values and filtering out NaN values for analysis
 ws_values = ds["WS"].values
 valid_ws_values = ws_values[np.isfinite(ws_values)]
 print("Non-NaN wind speed values:", valid_ws_values)
 print("Max valid wind speed:", np.max(valid_ws_values))
 print("Min valid wind speed:", np.min(valid_ws_values))
 
+#In the mettadata sigma_WS is the standard deviation of the wind speed measurements,
+## which can be used as a quality indicator. We will filter out any values that are NaN or exceed a reasonable threshold for sigma_WS.
 sig_ws_values = ds["sigma_WS"].values
 valid_sig_ws_values = sig_ws_values[np.isfinite(sig_ws_values)]
 print("Non-NaN sigma wind speed values:", valid_sig_ws_values)
@@ -54,6 +57,10 @@ print("Non-NaN sigma wind speed values:", valid_sig_ws_values)
 # Treat sigma_WS as a quality indicator, not as a correction to WS.
 MAX_SIGMA_WS = 1.0
 MAX_WIND_SPEED = np.mean(valid_ws_values) + 2 * np.std(valid_ws_values)  # Set a reasonable maximum wind speed for plotting
+## ^^ The reason for using mean + 2*std is to capture the majority of the data while excluding extreme outliers (i.e. + 2 values outside the std)
+##typically the 2+ std method captures about 95% of the data in a normal distribution
+#  This threshold helps ensure that the plotted wind speeds are representative 
+# of typical conditions rather than being dominated by rare, extreme events.
 print("Maximum wind speed for plotting:", MAX_WIND_SPEED)
 
 
