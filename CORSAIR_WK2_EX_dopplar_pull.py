@@ -75,97 +75,141 @@ if first_day_indices.size == 0:
 	raise ValueError("No files found for 2026-08-09")
 first_day = ds.isel(time=first_day_indices)
 
-quality_mask = (
-	first_day["WS"].notnull()
-	& first_day["sigma_WS"].notnull()
-	& (first_day["sigma_WS"] <= MAX_SIGMA_WS)
-	& (first_day["WS"] >= 0)
-	& (first_day["WS"] <= MAX_WIND_SPEED)
-)
-wind_speed = first_day["WS"].where(quality_mask).mean(dim="time", skipna=True)
-wind_speed_values = np.rint(wind_speed.values)
-valid_wind_speed = np.isfinite(wind_speed_values)
-integer_wind_speed = wind_speed_values[valid_wind_speed].astype(int)
-print("Valid plotted wind-speed points:", integer_wind_speed.size)
+# quality_mask = (
+# 	first_day["WS"].notnull()
+# 	& first_day["sigma_WS"].notnull()
+# 	& (first_day["sigma_WS"] <= MAX_SIGMA_WS)
+# 	& (first_day["WS"] >= 0)
+# 	& (first_day["WS"] <= MAX_WIND_SPEED)
+# )
+# wind_speed = first_day["WS"].where(quality_mask).mean(dim="time", skipna=True)
+# wind_speed_values = np.rint(wind_speed.values)
+# valid_wind_speed = np.isfinite(wind_speed_values)
+# integer_wind_speed = wind_speed_values[valid_wind_speed].astype(int)
+# print("Valid plotted wind-speed points:", integer_wind_speed.size)
 
-x_grid, y_grid, z_grid = np.meshgrid(
-	ds["x"].values,
-	ds["y"].values,
-	ds["z"].values,
-	indexing="ij",
-)
+# x_grid, y_grid, z_grid = np.meshgrid(
+# 	ds["x"].values,
+# 	ds["y"].values,
+# 	ds["z"].values,
+# 	indexing="ij",
+# )
 
-fig = plt.figure(figsize=(12, 9))
-ax = fig.add_subplot(projection="3d")
-scatter = ax.scatter(
-	x_grid.ravel()[valid_wind_speed.ravel()],
-	y_grid.ravel()[valid_wind_speed.ravel()],
-	z_grid.ravel()[valid_wind_speed.ravel()],
-	c=integer_wind_speed,
-	cmap="RdYlGn_r",
-	vmin=0,
-	vmax=MAX_WIND_SPEED,
-	s=5,
-	alpha=0.35,
-)
+# fig = plt.figure(figsize=(12, 9))
+# ax = fig.add_subplot(projection="3d")
+# scatter = ax.scatter(
+# 	x_grid.ravel()[valid_wind_speed.ravel()],
+# 	y_grid.ravel()[valid_wind_speed.ravel()],
+# 	z_grid.ravel()[valid_wind_speed.ravel()],
+# 	c=integer_wind_speed,
+# 	cmap="RdYlGn_r",
+# 	vmin=0,
+# 	vmax=MAX_WIND_SPEED,
+# 	s=5,
+# 	alpha=0.35,
+# )
 
-ax.set_title("CORSAIR Doppler Wind Speed\n08/09/2026 daily mean")
-ax.set_xlabel("X (m)")
-ax.set_ylabel("Y (m)")
-ax.set_zlabel("Height Z (m)")
-ax.set_box_aspect((
-	float(ds.sizes["x"]),
-	float(ds.sizes["y"]),
-	float(ds.sizes["z"]) * 3,
-))
-fig.colorbar(scatter, ax=ax, pad=0.1, label="Wind speed (m/s)")
-fig.tight_layout()
+# ax.set_title("CORSAIR Doppler Wind Speed\n08/09/2026 daily mean")
+# ax.set_xlabel("X (m)")
+# ax.set_ylabel("Y (m)")
+# ax.set_zlabel("Height Z (m)")
+# ax.set_box_aspect((
+# 	float(ds.sizes["x"]),
+# 	float(ds.sizes["y"]),
+# 	float(ds.sizes["z"]) * 3,
+# ))
+# fig.colorbar(scatter, ax=ax, pad=0.1, label="Wind speed (m/s)")
+# fig.tight_layout()
 
-projection_fig, (xz_ax, yz_ax) = plt.subplots(
-	1, 2, figsize=(14, 6), constrained_layout=True
-)
-xz_scatter = xz_ax.scatter(
-	x_grid.ravel()[valid_wind_speed.ravel()],
-	z_grid.ravel()[valid_wind_speed.ravel()],
-	c=integer_wind_speed,
-	cmap="RdYlGn_r",
-	vmin=0,
-	vmax=MAX_WIND_SPEED,
-	s=5,
-	alpha=0.35,
-)
-yz_ax.scatter(
-	y_grid.ravel()[valid_wind_speed.ravel()],
-	z_grid.ravel()[valid_wind_speed.ravel()],
-	c=integer_wind_speed,
-	cmap="RdYlGn_r",
-	vmin=0,
-	vmax=MAX_WIND_SPEED,
-	s=5,
-	alpha=0.35,
-)
+# projection_fig, (xz_ax, yz_ax) = plt.subplots(
+# 	1, 2, figsize=(14, 6), constrained_layout=True
+# )
+# xz_scatter = xz_ax.scatter(
+# 	x_grid.ravel()[valid_wind_speed.ravel()],
+# 	z_grid.ravel()[valid_wind_speed.ravel()],
+# 	c=integer_wind_speed,
+# 	cmap="RdYlGn_r",
+# 	vmin=0,
+# 	vmax=MAX_WIND_SPEED,
+# 	s=5,
+# 	alpha=0.35,
+# )
+# yz_ax.scatter(
+# 	y_grid.ravel()[valid_wind_speed.ravel()],
+# 	z_grid.ravel()[valid_wind_speed.ravel()],
+# 	c=integer_wind_speed,
+# 	cmap="RdYlGn_r",
+# 	vmin=0,
+# 	vmax=MAX_WIND_SPEED,
+# 	s=5,
+# 	alpha=0.35,
+# )
 
-xz_ax.set_title("X-Z view")
-xz_ax.set_xlabel("X (m)")
-xz_ax.set_ylabel("Height Z (m)")
-xz_ax.set_box_aspect(1)
-yz_ax.set_title("Y-Z view")
-yz_ax.set_xlabel("Y (m)")
-yz_ax.set_ylabel("Height Z (m)")
-yz_ax.set_box_aspect(1)
-projection_fig.colorbar(
-	xz_scatter,
-	ax=(xz_ax, yz_ax),
-	orientation="horizontal",
-	location="bottom",
-	pad=0.08,
-	shrink=0.9,
-	label="Wind speed (m/s)",
-)
-projection_fig.suptitle("CORSAIR Doppler Wind Speed\n08/09/2026 daily mean")
+# xz_ax.set_title("X-Z view")
+# xz_ax.set_xlabel("X (m)")
+# xz_ax.set_ylabel("Height Z (m)")
+# xz_ax.set_box_aspect(1)
+# yz_ax.set_title("Y-Z view")
+# yz_ax.set_xlabel("Y (m)")
+# yz_ax.set_ylabel("Height Z (m)")
+# yz_ax.set_box_aspect(1)
+# projection_fig.colorbar(
+# 	xz_scatter,
+# 	ax=(xz_ax, yz_ax),
+# 	orientation="horizontal",
+# 	location="bottom",
+# 	pad=0.08,
+# 	shrink=0.9,
+# 	label="Wind speed (m/s)",
+# )
+# projection_fig.suptitle("CORSAIR Doppler Wind Speed\n08/09/2026 daily mean")
 
 # plot_path = Path(__file__).resolve().parent / "output_plots" / "corsair_20260809_3d_wind_speed.png"
 # plot_path.parent.mkdir(exist_ok=True)
 # fig.savefig(plot_path, dpi=200)
 # print(f"Saved 3D plot to: {plot_path}")
+#plt.show()
+
+#######################################################################################################################
+
+# Creating a quiver plot of wind direction at surface level ds['z'].value = 0 
+# 'WD' in degrees of horizontal wind direction (0=N, 90=E)
+
+quality_mask = (
+	first_day["WD"].notnull()
+	& first_day["sigma_WD"].notnull()
+	& (first_day["sigma_WD"] <= MAX_SIGMA_WS)
+	& (first_day["WD"] >= 0)
+	& (first_day["WD"] <= 90)
+)
+wind_dir = first_day["WD"].where(quality_mask).mean(dim="time", skipna=True)
+wind_dir_values = np.rint(wind_dir.values)
+valid_wind_dir = np.isfinite(wind_dir_values)
+integer_wind_dir = wind_dir_values[valid_wind_dir].astype(int)
+print("Valid plotted wind-direction points:", integer_wind_dir.size)
+
+x_grid, y_grid = np.meshgrid(
+	ds["x"].values,
+	ds["y"].values,
+	indexing="ij",
+)
+
+#define the ds.['x'] as a scalar
+z = np.exp(-(x_grid**2 + y_grid**2) / (2 * 100**2))  # Example Gaussian distribution for visualization
+
+plt.figure() 
+plt.quiver(
+	x_grid.ravel()[valid_wind_dir.ravel()],
+	y_grid.ravel()[valid_wind_dir.ravel()],
+	np.cos(np.deg2rad(integer_wind_dir)),
+	np.sin(np.deg2rad(integer_wind_dir)),
+	z.ravel()[valid_wind_dir.ravel()],
+	cmap="hsv",
+	scale=50,
+	alpha=0.7,
+)
+plt.title('wind dir quiver plot demo')
+plt.xlabel('x (m)')
+plt.ylabel('y (m)')
+plt.grid(True)
 plt.show()
