@@ -66,8 +66,8 @@ scatter = ax.scatter(
 	z_grid.ravel(),
 	c=wind_speed.values.ravel(),
 	cmap="viridis",
-	vmin=ds["WS"].min().values,
-	vmax=ds["WS"].max().values,
+	vmin=0,
+	vmax=35,
 	s=5,
 	alpha=0.35,
 )
