@@ -173,46 +173,121 @@ first_day = ds.isel(time=first_day_indices)
 #######################################################################################################################
 
 # Creating a quiver plot of wind direction at surface level ds['z'].value = 0 
-# 'WD' in degrees of horizontal wind direction (0=N, 90=E)
+# 'WD' in degrees of horizontal wind direction (0=N, 90=E, 180=S, 270=W)
 
-quality_mask = (
-	first_day["WD"].notnull()
-	& first_day["sigma_WD"].notnull()
-	& (first_day["sigma_WD"] <= MAX_SIGMA_WS)
-	& (first_day["WD"] >= 0)
-	& (first_day["WD"] <= 90)
-)
-wind_dir = first_day["WD"].where(quality_mask).mean(dim="time", skipna=True)
-wind_dir_values = np.rint(wind_dir.values)
-valid_wind_dir = np.isfinite(wind_dir_values)
-integer_wind_dir = wind_dir_values[valid_wind_dir].astype(int)
-print("Valid plotted wind-direction points:", integer_wind_dir.size)
+print("z levels:", ds["z"].values)
 
-x_grid, y_grid = np.meshgrid(
-	ds["x"].values,
-	ds["y"].values,
-	indexing="ij",
-)
+z_level = 0  # Surface level at set meters
+
+# Select surface level (z=0) before averaging over time so WD is 2D (x, y).
+# surface = first_day.sel(z=z_level, method="nearest")
+
+# quality_mask = (
+# 	surface["WD"].notnull()
+# 	& surface["sigma_WD"].notnull()
+# 	& (surface["sigma_WD"] <= MAX_SIGMA_WS)
+# 	& (surface["WD"] >= 0)
+# 	& (surface["WD"] <= 360)
+# )
+# wind_dir = surface["WD"].where(quality_mask).mean(dim="time", skipna=True)
+# wind_dir_values = np.rint(wind_dir.values)
+# valid_wind_dir = np.isfinite(wind_dir_values)
+# integer_wind_dir = wind_dir_values[valid_wind_dir].astype(int)
+# print("Valid plotted wind-direction points:", integer_wind_dir.size)
+
+# x_grid, y_grid = np.meshgrid(
+# 	ds["x"].values,
+# 	ds["y"].values,
+# 	indexing="ij",
+# )
 
 #define the ds.['x'] as a scalar
-z = np.exp(-(x_grid**2 + y_grid**2) / (2 * 100**2))  # Example Gaussian distribution for visualization
+# z = np.exp(-(x_grid**2 + y_grid**2) / (2 * 100**2))  # Example Gaussian distribution for visualization
 
-plt.figure() 
-plt.quiver(
-	x_grid.ravel()[valid_wind_dir.ravel()],
-	y_grid.ravel()[valid_wind_dir.ravel()],
-	np.cos(np.deg2rad(integer_wind_dir)),
-	np.sin(np.deg2rad(integer_wind_dir)),
-	z.ravel()[valid_wind_dir.ravel()],
-	cmap="hsv",
-	scale=50,
-	alpha=0.7,
-)
-plt.title('wind dir quiver plot demo')
-plt.xlabel('x (m)')
-plt.ylabel('y (m)')
-plt.grid(True)
-plt.show()
+# plt.figure() 
+# plt.quiver(
+# 	x_grid.ravel()[valid_wind_dir.ravel()],
+# 	y_grid.ravel()[valid_wind_dir.ravel()],
+# 	np.cos(np.deg2rad(integer_wind_dir)),
+# 	np.sin(np.deg2rad(integer_wind_dir)),
+# 	z.ravel()[valid_wind_dir.ravel()],
+# 	cmap="hsv",
+# 	scale=50,
+# 	alpha=0.7,
+# )
+# plt.title(f'Wind Direction at z={z_level} m 2026-08-09')
+# plt.xlabel('x (m)')
+# plt.ylabel('y (m)')
+# plt.grid(True)
+# plt.show()
 
+###########################################################################################
+#compile quiver plots that take both wind speed and wind direction into account at seprate z levels
+ws_wd_z_levels = [0, 25, 50, 75, 100, 125, 150, 175, 200]  # Example z levels for quiver plots
 
-#try to fix this later\
+for z_level in ws_wd_z_levels:
+    surface = first_day.sel(z=z_level, method="nearest")
+
+    # Wind direction quality mask
+    wd_quality_mask = (
+        surface["WD"].notnull()
+        & surface["sigma_WD"].notnull()
+        & (surface["sigma_WD"] <= MAX_SIGMA_WS)
+        & (surface["WD"] >= 0)
+        & (surface["WD"] <= 360)
+    )
+
+    # Wind speed quality mask
+    ws_quality_mask = (
+        surface["WS"].notnull()
+        & surface["sigma_WS"].notnull()
+        & (surface["sigma_WS"] <= MAX_SIGMA_WS)
+        & (surface["WS"] >= 0)
+        & (surface["WS"] <= MAX_WIND_SPEED)
+    )
+
+    # Combine both quality masks so vectors only use points valid for both
+    combined_mask = wd_quality_mask & ws_quality_mask
+
+    wind_dir = surface["WD"].where(combined_mask).mean(dim="time", skipna=True)
+    wind_speed = surface["WS"].where(combined_mask).mean(dim="time", skipna=True)
+
+    wind_dir_values = wind_dir.values
+    wind_speed_values = wind_speed.values
+
+    valid_points = np.isfinite(wind_dir_values) & np.isfinite(wind_speed_values)
+    print(f"Valid combined WS/WD points at z={z_level} m:", np.count_nonzero(valid_points))
+
+    x_grid, y_grid = np.meshgrid(
+        ds["x"].values,
+        ds["y"].values,
+        indexing="ij",
+    )
+
+    # Flatten arrays and apply the valid mask
+    x_flat = x_grid.ravel()[valid_points.ravel()]
+    y_flat = y_grid.ravel()[valid_points.ravel()]
+    dir_flat = wind_dir_values.ravel()[valid_points.ravel()]
+    speed_flat = wind_speed_values.ravel()[valid_points.ravel()]
+
+    # Vector components: magnitude = wind speed, direction = wind direction
+    u = speed_flat * np.cos(np.deg2rad(dir_flat))
+    v = speed_flat * np.sin(np.deg2rad(dir_flat))
+
+    plt.figure()
+    quiver = plt.quiver(
+        x_flat,
+        y_flat,
+        u,
+        v,
+        speed_flat,
+        cmap="viridis",
+        scale=None,  # let matplotlib auto-scale based on speed magnitude
+        alpha=0.8,
+    )
+    plt.colorbar(quiver, label="Wind speed (m/s)")
+    plt.title(f'Wind Speed & Direction at z={z_level} m 2026-08-09')
+    plt.xlabel('x (m)')
+    plt.ylabel('y (m)')
+    plt.grid(True)
+    plt.show()
