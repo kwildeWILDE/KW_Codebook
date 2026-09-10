@@ -48,7 +48,8 @@ wv_at_height_m = ds['waterVapor'].isel(height=47).values # (height index 47 = ~8
 wv_at_height_u = ds['waterVapor'].isel(height=54).values # (height index 54 = ~17.09 km)
 
 #extracting and plotting the qc_flags over the time period for the different levels of the troposphere
-qc_ind_overall = ds['qc_flag']
+qc_ind_overall = ds['qc_flag'] #not the best, use different method
+#look at the report on how to build a diffenert quality control 
 
 times = ds['time'].values
 
@@ -57,11 +58,11 @@ y2 = ds['qc_flag']
 
 fig, ax1 = plt.subplots(figsize=(12, 6))
 
-ax1.plot(times, wv_at_height_l, linewidth=2,color='blue', label='Lower Troposphere ~1.21 km')
+ax1.plot(times, wv_at_height_l, linestyle='-.', linewidth=2, color='blue', label='Lower Troposphere ~1.21 km')
 
-ax1.plot(times, wv_at_height_m, linewidth=2, color='green', label='Middle Troposphere ~8.72 km')
+ax1.plot(times, wv_at_height_m, linestyle='-.', linewidth=2, color='green', label='Middle Troposphere ~8.72 km')
 
-ax1.plot(times, wv_at_height_u, linewidth=2, color='red', label='Upper Troposphere ~17.09 km')
+ax1.plot(times, wv_at_height_u, linestyle='-.', linewidth=2, color='red', label='Upper Troposphere ~17.09 km')
 
 ax1.set_xlabel('Time', fontsize=12)
 ax1.set_ylabel('Water Vapor (g/kg)', fontsize=12)
@@ -84,3 +85,5 @@ plt.savefig(output_path, dpi=150)
 print(f"\n✓ Plot saved to: {output_path}")
 
 plt.show()  # Show the plot in an interactive window
+
+#fix later after going thriugh concepts 
