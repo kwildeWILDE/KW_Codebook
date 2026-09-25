@@ -70,24 +70,74 @@ theta2 = (temp2 + 273.15) * (stnd_pressure / pressure) ** k_con
 theta50 = (temp50 + 273.15) * (stnd_pressure / pressure) ** k_con
 theta80 = (temp80 + 273.15) * (stnd_pressure / pressure) ** k_con
 
-plt.figure(figsize=(12, 6))
-plt.plot(time, theta2, label='Potential Temperature @ 2m [K]', color='blue')
-plt.plot(time, theta50, label='Potential Temperature @ 50m [K]', color='green')
-plt.plot(time, theta80, label='Potential Temperature @ 80m [K]', color='red')
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, theta2, label='Potential Temperature @ 2m [K]', color='blue')
+# plt.plot(time, theta50, label='Potential Temperature @ 50m [K]', color='green')
+# plt.plot(time, theta80, label='Potential Temperature @ 80m [K]', color='red')
 
-#setting up the x-axis to show time in a readable format
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+# #setting up the x-axis to show time in a readable format
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
 
-plt.xlabel('Time')
-plt.ylabel('Potential Temperature [K]')
-plt.title('Potential Temperature Over Time SEPT 19 2026')
-plt.xticks(rotation=45, fontsize=10)
-plt.yticks(fontsize=10)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.legend(fontsize=10)
-plt.show()
+# plt.xlabel('Time')
+# plt.ylabel('Potential Temperature [K]')
+# plt.title('Potential Temperature Over Time SEPT 19 2026')
+# plt.xticks(rotation=45, fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
 
 ##############################################
-#Regret Not getting the Dew Temp brb pullig that up 
+#Sadly there is no 'Dew Point' Temp at the different heights in the dataset so there's no indication of high moisture at the heights
+##########################################
+
+#Plotting the wind speeds over time at different heights 
+
+wind_sp2 = ds['Avg Wind Speed @ 2m [m/s]']
+wind_sp50 = ds['Avg Wind Speed @ 50m [m/s]']
+wind_sp80 = ds['Avg Wind Speed @ 80m [m/s]']
+
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, wind_sp2, label='Wind Speed @ 2m [m/s]', color='blue')
+# plt.plot(time, wind_sp50, label='Wind Speed @ 50m [m/s]', color='green')
+# plt.plot(time, wind_sp80, label='Wind Speed @ 80m [m/s]', color='red')
+
+# #setting up the x-axis to show time in a readable format
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+
+# plt.xlabel('Time')
+# plt.ylabel('Wind Speed [m/s]')
+# plt.title('Wind Speed Over Time SEPT 19 2026')
+# plt.xticks(rotation=45, fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
+
+##############################
+# Plotting the Turbulence Intensity at different heights
+#with a rolling mean of 10 minutes
+
+wind_std2 = wind_sp2.rolling('10min').std()
+wind_std50 = wind_sp50.rolling('10min').std()
+wind_std80 = wind_sp80.rolling('10min').std()
+
+wind_avg2 = wind_sp2.rolling('10min').mean()
+wind_avg50 = wind_sp50.rolling('10min').mean()
+wind_avg80 = wind_sp80.rolling('10min').mean()
+
+turb_int2 = wind_std2 / wind_avg2
+turb_int50 = wind_std50 / wind_avg50
+turb_int80 = wind_std80 / wind_avg80
+
+
+
+
+
+############################################################################
+# To plot the bluk richardson number I need to get the virtual potential temperature, 
+# and the change of the u and v components with height (do after plotting the wind directeion and the easier varaibles first)
