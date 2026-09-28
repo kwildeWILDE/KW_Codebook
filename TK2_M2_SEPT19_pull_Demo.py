@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 import xarray as xr 
 import matplotlib.pyplot as plt
+from matplotlib import animation
 import os 
 from pathlib import Path
 import matplotlib.dates as mdates
@@ -57,6 +58,7 @@ time = df['datetime']
 #Plotting the potential temperatures over time at different heights
 #potnetal tmep (theata) is the temperature a parcel of air would have if it were 
 # expanded or compressed adiabatically to a standard pressure (usually 1000 hPa)
+#can onlly do these calucluations at 2, 50, and 80m because those are the heights where we have both temperature and pressure data
 
 #standard pressure p*
 stnd_pressure = ds['Sea-Level Pressure (Est) [mBar]']
@@ -109,11 +111,17 @@ theta80 = (temp80 + 273.15) * (stnd_pressure / press80) ** k_con
 #Plotting the wind speeds over time at different heights 
 
 wind_sp2 = ds['Avg Wind Speed @ 2m [m/s]']
+wind_sp5 = ds['Avg Wind Speed @ 5m [m/s]']
+wind_sp10 = ds['Avg Wind Speed @ 10m [m/s]']
+wind_sp20 = ds['Avg Wind Speed @ 20m [m/s]']
 wind_sp50 = ds['Avg Wind Speed @ 50m [m/s]']
 wind_sp80 = ds['Avg Wind Speed @ 80m [m/s]']
 
 # plt.figure(figsize=(12, 6))
 # plt.plot(time, wind_sp2, label='Wind Speed @ 2m [m/s]', color='blue')
+# plt.plot(time, wind_sp5, label='Wind Speed @ 5m [m/s]', color='cyan')
+# plt.plot(time, wind_sp10, label='Wind Speed @ 10m [m/s]', color='magenta')
+# plt.plot(time, wind_sp20, label='Wind Speed @ 20m [m/s]', color='yellow')
 # plt.plot(time, wind_sp50, label='Wind Speed @ 50m [m/s]', color='green')
 # plt.plot(time, wind_sp80, label='Wind Speed @ 80m [m/s]', color='red')
 
@@ -140,20 +148,32 @@ wind_sp80 = ds['Avg Wind Speed @ 80m [m/s]']
 
 
 wind_std2 = ds['Avg Wind Speed @ 2m [m/s]'].rolling(index=10).std()
+wind_std5 = ds['Avg Wind Speed @ 5m [m/s]'].rolling(index=10).std()
+wind_std10 = ds['Avg Wind Speed @ 10m [m/s]'].rolling(index=10).std()
+wind_std20 = ds['Avg Wind Speed @ 20m [m/s]'].rolling(index=10).std()
 wind_std50 = ds['Avg Wind Speed @ 50m [m/s]'].rolling(index=10).std()
 wind_std80 = ds['Avg Wind Speed @ 80m [m/s]'].rolling(index=10).std()
 
 wind_avg2 = ds['Avg Wind Speed @ 2m [m/s]'].rolling(index=10).mean()
+wind_avg5 = ds['Avg Wind Speed @ 5m [m/s]'].rolling(index=10).mean()
+wind_avg10 = ds['Avg Wind Speed @ 10m [m/s]'].rolling(index=10).mean()
+wind_avg20 = ds['Avg Wind Speed @ 20m [m/s]'].rolling(index=10).mean()
 wind_avg50 = ds['Avg Wind Speed @ 50m [m/s]'].rolling(index=10).mean()
 wind_avg80 = ds['Avg Wind Speed @ 80m [m/s]'].rolling(index=10).mean()
 
 turb_int2 = wind_std2 / wind_avg2
+turb_int5 = wind_std5 / wind_avg5
+turb_int10 = wind_std10 / wind_avg10
+turb_int20 = wind_std20 / wind_avg20
 turb_int50 = wind_std50 / wind_avg50
 turb_int80 = wind_std80 / wind_avg80
 
 #plotting the turbulence intensity over time at different heights
 # plt.figure(figsize=(12, 6))
 # plt.plot(time, turb_int2, label='Turbulence Intensity @ 2m', color='blue')
+# plt.plot(time, turb_int5, label='Turbulence Intensity @ 5m', color='cyan')
+# plt.plot(time, turb_int10, label='Turbulence Intensity @ 10m', color='magenta')
+# plt.plot(time, turb_int20, label='Turbulence Intensity @ 20m', color='yellow')
 # plt.plot(time, turb_int50, label='Turbulence Intensity @ 50m', color='green')
 # plt.plot(time, turb_int80, label='Turbulence Intensity @ 80m', color='red')
 
@@ -175,6 +195,7 @@ turb_int80 = wind_std80 / wind_avg80
 #to calcultate the reynolds number I need to get the density and the viscosity of the atmosphere at the different heights
 
 #thankfully for the ideal gas law we can get the density simply with the temperature and pressuere at the different heights 
+#can only do it for heights of 2,50, and 80m because those are the heights where we have both temperature and pressure data
 
 R_air = 287.05  # J/(kg·K), specific gas constant for dry air
 
@@ -199,26 +220,121 @@ Re50 = (rho50 * wind_avg50 * 50) / mu50  # Reynolds number at 50m
 Re80 = (rho80 * wind_avg80 * 80) / mu80  # Reynolds number at 80m
 
 #plotting the Reynolds number at different heights
-plt.figure(figsize=(12, 6))
-plt.plot(time, Re2, label='Reynolds Number @ 2m', color='blue')
-plt.plot(time, Re50, label='Reynolds Number @ 50m', color='green')
-plt.plot(time, Re80, label='Reynolds Number @ 80m', color='red')
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, Re2, label='Reynolds Number @ 2m', color='blue')
+# plt.plot(time, Re50, label='Reynolds Number @ 50m', color='green')
+# plt.plot(time, Re80, label='Reynolds Number @ 80m', color='red')
 
-# #setting up the x-axis to show time in a readable format
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+# # #setting up the x-axis to show time in a readable format
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
 
-plt.xlabel('Time')
-plt.ylabel('Reynolds Number')
-plt.title('Reynolds Number Over Time SEPT 19 2026')
-plt.xticks(rotation=45, fontsize=10)
-plt.yticks(fontsize=10)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.legend(fontsize=10)
-plt.show()
+# plt.xlabel('Time')
+# plt.ylabel('Reynolds Number')
+# plt.title('Reynolds Number Over Time SEPT 19 2026')
+# plt.xticks(rotation=45, fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
+
+
+##########################################################################
+#plotting an animated wind speed and direction quiver plot at certain height over time
+#wind direction also has heights of 2,5,10,20,50,80m
+
+wind_dir2 = ds['Avg Wind Direction @ 2m [deg]']
+wind_dir5 = ds['Avg Wind Direction @ 5m [deg]']
+wind_dir10 = ds['Avg Wind Direction @ 10m [deg]']
+wind_dir20 = ds['Avg Wind Direction @ 20m [deg]']
+wind_dir50 = ds['Avg Wind Direction @ 50m [deg]']
+wind_dir80 = ds['Avg Wind Direction @ 80m [deg]']
+
+#convert wind direction  and wind speed into compoents of u and v wind components for plotting
+u2 = wind_sp2 * np.cos(np.deg2rad(wind_dir2))
+v2 = wind_sp2 * np.sin(np.deg2rad(wind_dir2))
+
+u5 = wind_sp5 * np.cos(np.deg2rad(wind_dir5))
+v5 = wind_sp5 * np.sin(np.deg2rad(wind_dir5))
+
+u10 = wind_sp10 * np.cos(np.deg2rad(wind_dir10))
+v10 = wind_sp10 * np.sin(np.deg2rad(wind_dir10))
+
+u20 = wind_sp20 * np.cos(np.deg2rad(wind_dir20))
+v20 = wind_sp20 * np.sin(np.deg2rad(wind_dir20))
+
+u50 = wind_sp50 * np.cos(np.deg2rad(wind_dir50))
+v50 = wind_sp50 * np.sin(np.deg2rad(wind_dir50))
+
+u80 = wind_sp80 * np.cos(np.deg2rad(wind_dir80))
+v80 = wind_sp80 * np.sin(np.deg2rad(wind_dir80))
+
+
+#Created an animated quiver plot for wind speed and direction at all heights
+u2_vals, v2_vals = u2.values, v2.values
+u5_vals, v5_vals = u5.values, v5.values
+u10_vals, v10_vals = u10.values, v10.values
+u20_vals, v20_vals = u20.values, v20.values
+u50_vals, v50_vals = u50.values, v50.values
+u80_vals, v80_vals = u80.values, v80.values
+time_vals = time.values
+
+# Gather everything in lists for easy looping
+heights = ['2m', '5m', '10m', '20m', '50m', '80m']
+u_all = [u2_vals, u5_vals, u10_vals, u20_vals, u50_vals, u80_vals]
+v_all = [v2_vals, v5_vals, v10_vals, v20_vals, v50_vals, v80_vals]
+colors = ['blue', 'cyan', 'magenta', 'orange', 'green', 'red']
+
+max_speed = max(
+    wind_sp2.max().item(), wind_sp5.max().item(), wind_sp10.max().item(),
+    wind_sp20.max().item(), wind_sp50.max().item(), wind_sp80.max().item()
+)
+
+fig, ax = plt.subplots(figsize=(7, 7))
+ax.set_xlim(-max_speed * 1.2, max_speed * 1.2)
+ax.set_ylim(-max_speed * 1.2, max_speed * 1.2)
+ax.set_aspect('equal')
+ax.set_title('Wind Speed and Direction @ All Heights SEPT 19 2026')
+ax.axhline(0, color='gray', lw=0.5)
+ax.axvline(0, color='gray', lw=0.5)
+
+# Create one quiver per height, with transparency so overlapping arrows are visible
+# quivers = []
+# for u_vals, v_vals, color, label in zip(u_all, v_all, colors, heights):
+#     q = ax.quiver(
+#         0, 0, u_vals[0], v_vals[0],
+#         scale=1, scale_units='xy', angles='xy',
+#         color=color, alpha=0.6, label=label
+#     )
+#     quivers.append(q)
+
+# ax.legend(loc='upper right', fontsize=8)
+# time_text = ax.text(0.02, 0.95, '', transform=ax.transAxes)
+
+# def update_quiver(num, u_all, v_all, quivers, time_text, time_vals):
+#     for q, u_vals, v_vals in zip(quivers, u_all, v_all):
+#         q.set_UVC(u_vals[num], v_vals[num])
+#     time_text.set_text(str(time_vals[num]))
+#     return (*quivers, time_text)
+
+# ani = animation.FuncAnimation(
+#     fig, update_quiver, frames=len(time_vals),
+#     fargs=(u_all, v_all, quivers, time_text, time_vals),
+#     interval=100, blit=False
+# )
+
+# Save as a GIF (works without ffmpeg, uses Pillow which comes with matplotlib)
+# gif_path = f"{dp}/GitHub/KW_Codebook/output_plots/M2_SEPT19_2026_plots/wind_quiver_sept19_2026.gif"
+# ani.save(gif_path, writer=animation.PillowWriter(fps=10))
+# print(f"Saved GIF to {gif_path}")
+
+# plt.show()
 
 
 ############################################################################
-# To plot the bluk richardson number I need to get the virtual potential temperature, 
-# and the change of the u and v components with height (do after plotting the wind directeion and the easier varaibles first)
+# To plot the bluk richardson number I need to get the virtual potential temperature,
+# in order to do that I need the dew point temperature at the station 
+#so I have to go back to the M2 data and pull the dew point temperature at the station
+
+
