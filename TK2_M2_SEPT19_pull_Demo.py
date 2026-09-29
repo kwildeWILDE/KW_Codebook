@@ -7,6 +7,7 @@ from matplotlib import animation
 import os 
 from pathlib import Path
 import matplotlib.dates as mdates
+from scipy.stats import gaussian_kde, norm
 
 #upload the excel file
 dp = "C:/Users/kwilde/Documents" 
@@ -434,24 +435,114 @@ post_TI50 = ds2['Turbulence Intensity @ 50m']
 post_TI80 = ds2['Turbulence Intensity @ 80m']
 
 #plotting the recorded turb intentisity
-plt.figure(figsize=(12, 6))
-plt.plot(time, post_TI2, c='b',ls='--', label='post_TI2')
-plt.plot(time, post_TI5, c='c',ls='--', label='post_TI5')
-plt.plot(time, post_TI10, c='m',ls='--', label='post_TI10')
-plt.plot(time, post_TI20, c='y',ls='--', label='post_TI20')
-plt.plot(time, post_TI50, c='g',ls='--', label='post_TI50')
-plt.plot(time, post_TI80, c='r',ls='--', label='post_TI80')
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, post_TI2, c='b',ls='--', label='post_TI2')
+# plt.plot(time, post_TI5, c='c',ls='--', label='post_TI5')
+# plt.plot(time, post_TI10, c='m',ls='--', label='post_TI10')
+# plt.plot(time, post_TI20, c='y',ls='--', label='post_TI20')
+# plt.plot(time, post_TI50, c='g',ls='--', label='post_TI50')
+# plt.plot(time, post_TI80, c='r',ls='--', label='post_TI80')
 
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
 
-plt.xlabel('Time')
-plt.ylabel('Turbulence Intensity')
-plt.title('Recorded Turbulence Intensity Over Time SEPT 19 2026')
-plt.xticks(rotation=45, fontsize=10)
-plt.yticks(fontsize=10)
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.legend(fontsize=10)
-plt.show()
+# plt.xlabel('Time')
+# plt.ylabel('Turbulence Intensity')
+# plt.title('Recorded Turbulence Intensity Over Time SEPT 19 2026')
+# plt.xticks(rotation=45, fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
 
+####################################################################################
+#Start the devlopment of pdf for the features of the atmosphere and the wind
+
+#Create a histogram of the frequency of the wind speeds at different heights
+# plt.figure(figsize=(12, 6))
+# plt.hist(wind_sp2, bins=30, color='b', alpha=0.6, label='Wind Speed @ 2m')
+# plt.hist(wind_sp5, bins=30, color='c', alpha=0.6, label='Wind Speed @ 5m')
+# plt.hist(wind_sp10, bins=30, color='m', alpha=0.6, label='Wind Speed @ 10m')
+# plt.hist(wind_sp20, bins=30, color='y', alpha=0.6, label='Wind Speed @ 20m')
+# plt.hist(wind_sp50, bins=30, color='g', alpha=0.6, label='Wind Speed @ 50m')
+# plt.hist(wind_sp80, bins=30, color='r', alpha=0.6, label='Wind Speed @ 80m')
+
+# #distribution pdf line for the wind speeds
+# for wind_sp, color in zip([wind_sp2, wind_sp5, wind_sp10, wind_sp20, wind_sp50, wind_sp80], ['b', 'c', 'm', 'y', 'g', 'r']):
+#     wind_sp = np.asarray(wind_sp).ravel()  # convert xarray DataArray to a plain 1D numpy array
+#     sp_mean = np.nanmean(wind_sp)
+#     sp_std = np.nanstd(wind_sp)
+#     sp_dist = norm(sp_mean, sp_std)
+#     sp_min = np.nanmin(wind_sp)
+#     sp_max = np.nanmax(wind_sp)
+#     x = np.linspace(sp_min, sp_max, 1000)
+#     plt.plot(x, sp_dist.pdf(x) * len(wind_sp) * (sp_max - sp_min) / 30, c=color, lw=2)
+
+
+# plt.xlabel('Wind Speed')
+# plt.ylabel('Frequency')
+# plt.title('Histogram and Respective Distribution PDF line of Wind Speeds at Different Heights SEPT 19 2026')
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
+
+########################################################################
+#historogram and PDF line for wind direction
+# plt.figure(figsize=(12, 6))
+# plt.hist(wind_dir2, bins=15, color='b', alpha=0.6, label='Wind Direction @ 2m')
+# plt.hist(wind_dir5, bins=15, color='c', alpha=0.6, label='Wind Direction @ 5m')
+# plt.hist(wind_dir10, bins=15, color='m', alpha=0.6, label='Wind Direction @ 10m')
+# plt.hist(wind_dir20, bins=15, color='y', alpha=0.6, label='Wind Direction @ 20m')
+# plt.hist(wind_dir50, bins=15, color='g', alpha=0.6, label='Wind Direction @ 50m')
+# plt.hist(wind_dir80, bins=15, color='r', alpha=0.6, label='Wind Direction @ 80m')
+
+# #distribution pdf line for the wind directions
+# for wind_dir, color in zip([wind_dir2, wind_dir5, wind_dir10, wind_dir20, wind_dir50, wind_dir80], ['b', 'c', 'm', 'y', 'g', 'r']):
+#     wind_dir = np.asarray(wind_dir).ravel()  # convert xarray DataArray to a plain 1D numpy array
+#     dir_mean = np.nanmean(wind_dir)
+#     dir_std = np.nanstd(wind_dir)
+#     dir_dist = norm(dir_mean, dir_std)
+#     dir_min = np.nanmin(wind_dir)
+#     dir_max = np.nanmax(wind_dir)
+#     x = np.linspace(dir_min, dir_max, 1000)
+#     plt.plot(x, dir_dist.pdf(x) * len(wind_dir) * (dir_max - dir_min) / 15, c=color, lw=2)
+
+# plt.xlabel('Wind Direction')
+# plt.ylabel('Frequency')
+# plt.title('Histogram and Respective Distribution PDF line of Wind Directions at Different Heights SEPT 19 2026')
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
+
+##########################################################################################
+#histogram and PDF line for temperature
+# plt.figure(figsize=(12, 6))
+# plt.hist(temp2, bins=15, color='b', alpha=0.6, label='Temperature @ 2m')
+# plt.hist(temp50, bins=15, color='g', alpha=0.6, label='Temperature @ 50m')
+# plt.hist(temp80, bins=15, color='r', alpha=0.6, label='Temperature @ 80m')
+
+# for temp, color in zip([temp2, temp50, temp80], ['b', 'g', 'r']):
+#     temp = np.asarray(temp).ravel()  # convert xarray DataArray to a plain 1D numpy array
+#     temp_mean = np.nanmean(temp)
+#     temp_std = np.nanstd(temp)
+#     temp_dist = norm(temp_mean, temp_std)
+#     temp_min = np.nanmin(temp)
+#     temp_max = np.nanmax(temp)
+#     x = np.linspace(temp_min, temp_max, 1000)
+#     plt.plot(x, temp_dist.pdf(x) * len(temp) * (temp_max - temp_min) / 15, c=color, lw=2)
+
+# plt.xlabel('Temperature')
+# plt.ylabel('Frequency')
+# plt.title('Histogram and Respective Distribution PDF line of Temperatures at Different Heights SEPT 19 2026')
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
+
+#############################################################################################################
+#create a timelapse of wind speed, direction, and temperature on the same plot to see the correlation and agreement
+
+heights = [2,50,80] 
