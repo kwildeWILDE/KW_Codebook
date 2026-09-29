@@ -291,13 +291,13 @@ max_speed = max(
     wind_sp20.max().item(), wind_sp50.max().item(), wind_sp80.max().item()
 )
 
-fig, ax = plt.subplots(figsize=(7, 7))
-ax.set_xlim(-max_speed * 1.2, max_speed * 1.2)
-ax.set_ylim(-max_speed * 1.2, max_speed * 1.2)
-ax.set_aspect('equal')
-ax.set_title('Wind Speed and Direction @ All Heights SEPT 19 2026')
-ax.axhline(0, color='gray', lw=0.5)
-ax.axvline(0, color='gray', lw=0.5)
+# fig, ax = plt.subplots(figsize=(7, 7))
+# ax.set_xlim(-max_speed * 1.2, max_speed * 1.2)
+# ax.set_ylim(-max_speed * 1.2, max_speed * 1.2)
+# ax.set_aspect('equal')
+# ax.set_title('Wind Speed and Direction @ All Heights SEPT 19 2026')
+# ax.axhline(0, color='gray', lw=0.5)
+# ax.axvline(0, color='gray', lw=0.5)
 
 # Create one quiver per height, with transparency so overlapping arrows are visible
 # quivers = []
@@ -336,5 +336,65 @@ ax.axvline(0, color='gray', lw=0.5)
 # To plot the bluk richardson number I need to get the virtual potential temperature,
 # in order to do that I need the dew point temperature at the station 
 #so I have to go back to the M2 data and pull the dew point temperature at the station
+# also getting the station's richardson number to compare with the computed bulk richardson number
+
+# Pulling the second part of the dataset onto here
+dp = "C:/Users/kwilde/Documents" 
+file_path2 = f"{dp}/PT2_PUB_M2_SEPT19_2026.xlsx"
+
+#reading to make sure it reads right
+df2 = pd.read_excel(file_path2)
+print(df2.head())
+
+#set up the datadrame into a xarray Dataset
+ds2 = df2.to_xarray()
+print(ds2.head(5))  # Display the first 5 rows of the xarray Dataset to verify conversion
+
+#okay now that works we can calculate the virtual potential temperature and the bulk Richardson number
+#getting the virtual temperature [in k]
+Tv_D1 = 1 - 0.379 
+Tv_D2 = (6.11 * 10**(7.5 * ds2['Dew Point Temp [deg C]'] / (237.3 + ds2['Dew Point Temp [deg C]']))) / (pressure)
+
+Tv_2 = temp2_K / (Tv_D1 * Tv_D2)
+Tv_50 = temp50_K / (Tv_D1 * Tv_D2)
+Tv_80 = temp80_K / (Tv_D1 * Tv_D2)
+
+#print(Tv_2, Tv_50, Tv_80)
+
+#converting Tv to virtual potential temperature (theta_v)
+#the exp of 0.286 comes from the Poisson equation for potential temperature, where 0.286 = R/cp for dry air
+theta_v_2 = Tv_2 * (stnd_pressure / press2)**0.286
+theta_v_50 = Tv_50 * (stnd_pressure / press50)**0.286
+theta_v_80 = Tv_80 * (stnd_pressure / press80)**0.286
+
+#For the bulk Richardson number, we need the difference in virtual potential temperature and wind speed between two levels
+delta_theta_v_2_50 = theta_v_50 - theta_v_2
+delta_theta_v_50_80 = theta_v_80 - theta_v_50
+
+delta_u_2_50 = u50 - u2
+delta_u_50_80 = u80 - u50
+delta_v_2_50 = v50 - v2
+delta_v_50_80 = v80 - v50
+
+Ri_bulk_2_50 = (9.81 / theta_v_2) * delta_theta_v_2_50 * (50 - 2) / (delta_u_2_50**2 + delta_v_2_50**2)
+Ri_bulk_50_80 = (9.81 / theta_v_50) * delta_theta_v_50_80 * (80 - 50) / (delta_u_50_80**2 + delta_v_50_80**2)
 
 
+#plot the calculated bulk Richardson numbers
+plt.figure(figsize=(12, 6))
+plt.plot(time, np.log(Ri_bulk_2_50), label='Ri_bulk_2_50')
+plt.plot(time, np.log(Ri_bulk_50_80), label='Ri_bulk_50_80')
+
+# # #setting up the x-axis to show time in a readable format
+plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+
+plt.xlabel('Time')
+plt.ylabel('Bulk Richardson Number')
+plt.title('Bulk Richardson Number over Time')
+plt.xticks(rotation=45, fontsize=10)
+plt.yticks(fontsize=10)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.legend(fontsize=10)
+plt.show()
