@@ -544,5 +544,42 @@ post_TI80 = ds2['Turbulence Intensity @ 80m']
 
 #############################################################################################################
 #create a timelapse of wind speed, direction, and temperature on the same plot to see the correlation and agreement
+plt.figure(figsize=(12, 6*3.2))
 
-heights = [2,50,80] 
+#1 Wind speed time series
+plt.subplot(3, 1, 1)
+plt.plot(time, wind_sp2, 'b', label='Wind Speed @ 2m')
+plt.plot(time, wind_sp50, 'g', label='Wind Speed @ 50m')
+plt.plot(time, wind_sp80, 'r', label='Wind Speed @ 80m')
+#plt.xlabel('Time')
+plt.ylabel('Wind Speed')
+plt.title('Wind Speed Time Series at Different Heights SEPT 19 2026', fontsize=10)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.legend(fontsize=10)
+
+#2 Wind direction time series
+plt.subplot(3, 1, 2)
+plt.plot(time, wind_dir2, 'b', label='Wind Direction @ 2m')
+plt.plot(time, wind_dir50, 'g', label='Wind Direction @ 50m')
+plt.plot(time, wind_dir80, 'r', label='Wind Direction @ 80m')
+#plt.xlabel('Time')
+plt.ylabel('Wind Direction')
+plt.title('Wind Direction Time Series at Different Heights SEPT 19 2026', fontsize=10)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.legend(fontsize=10)
+
+#3 Temperature time series
+plt.subplot(3, 1, 3)
+plt.plot(time, temp2, 'b', label='Temperature @ 2m')
+plt.plot(time, temp50, 'g', label='Temperature @ 50m')
+plt.plot(time, temp80, 'r', label='Temperature @ 80m')
+plt.xlabel('Time')
+plt.ylabel('Temperature')
+plt.title('Temperature Time Series at Different Heights SEPT 19 2026', fontsize=10)
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.legend(fontsize=10)
+
+plt.tight_layout(h_pad=4.0)
+plt.subplots_adjust(hspace=0.4)
+plt.show()
+
