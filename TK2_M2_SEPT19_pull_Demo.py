@@ -8,7 +8,7 @@ from matplotlib.patches import Ellipse
 import os 
 from pathlib import Path
 import matplotlib.dates as mdates
-from scipy.stats import gaussian_kde, norm
+from scipy.stats import gaussian_kde, norm, multivariate_normal
 
 #upload the excel file
 dp = "C:/Users/kwilde/Documents" 
@@ -491,34 +491,34 @@ post_TI80 = ds2['Turbulence Intensity @ 80m']
 
 ########################################################################
 #historogram and PDF line for wind direction
-plt.figure(figsize=(12, 6))
-plt.hist(wind_dir2, bins=15, color='b', alpha=0.6, label='Wind Direction @ 2m')
-plt.hist(wind_dir5, bins=15, color='c', alpha=0.6, label='Wind Direction @ 5m')
-plt.hist(wind_dir10, bins=15, color='m', alpha=0.6, label='Wind Direction @ 10m')
-plt.hist(wind_dir20, bins=15, color='y', alpha=0.6, label='Wind Direction @ 20m')
-plt.hist(wind_dir50, bins=15, color='g', alpha=0.6, label='Wind Direction @ 50m')
-plt.hist(wind_dir80, bins=15, color='r', alpha=0.6, label='Wind Direction @ 80m')
+# plt.figure(figsize=(12, 6))
+# plt.hist(wind_dir2, bins=15, color='b', alpha=0.6, label='Wind Direction @ 2m')
+# plt.hist(wind_dir5, bins=15, color='c', alpha=0.6, label='Wind Direction @ 5m')
+# plt.hist(wind_dir10, bins=15, color='m', alpha=0.6, label='Wind Direction @ 10m')
+# plt.hist(wind_dir20, bins=15, color='y', alpha=0.6, label='Wind Direction @ 20m')
+# plt.hist(wind_dir50, bins=15, color='g', alpha=0.6, label='Wind Direction @ 50m')
+# plt.hist(wind_dir80, bins=15, color='r', alpha=0.6, label='Wind Direction @ 80m')
 
 #distribution pdf line for the wind directions
-for wind_dir, color in zip([wind_dir2, wind_dir5, wind_dir10, wind_dir20, wind_dir50, wind_dir80], ['b', 'c', 'm', 'y', 'g', 'r']):
-    wind_dir = np.asarray(wind_dir).ravel()  # convert xarray DataArray to a plain 1D numpy array
-    wind_dir = wind_dir[~np.isnan(wind_dir)]  # remove NaN values
-    #dir_mean = np.nanmean(wind_dir)
-    #dir_std = np.nanstd(wind_dir)
-    #dir_dist = norm(dir_mean, dir_std)
-    dir_kde = gaussian_kde(wind_dir)
-    dir_min = np.nanmin(wind_dir)
-    dir_max = np.nanmax(wind_dir)
-    x = np.linspace(dir_min, dir_max, 1000)
-    plt.plot(x, dir_kde(x) * len(wind_dir) * (dir_max - dir_min) / 15, c=color, lw=2)
+# for wind_dir, color in zip([wind_dir2, wind_dir5, wind_dir10, wind_dir20, wind_dir50, wind_dir80], ['b', 'c', 'm', 'y', 'g', 'r']):
+#     wind_dir = np.asarray(wind_dir).ravel()  # convert xarray DataArray to a plain 1D numpy array
+#     wind_dir = wind_dir[~np.isnan(wind_dir)]  # remove NaN values
+#     #dir_mean = np.nanmean(wind_dir)
+#     #dir_std = np.nanstd(wind_dir)
+#     #dir_dist = norm(dir_mean, dir_std)
+#     dir_kde = gaussian_kde(wind_dir)
+#     dir_min = np.nanmin(wind_dir)
+#     dir_max = np.nanmax(wind_dir)
+#     x = np.linspace(dir_min, dir_max, 1000)
+#     plt.plot(x, dir_kde(x) * len(wind_dir) * (dir_max - dir_min) / 15, c=color, lw=2)
 
-plt.xlabel('Wind Direction')
-plt.ylabel('Frequency')
-plt.title('Histogram and Respective Distribution PDF line of Wind Directions at Different Heights SEPT 19 2026')
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.legend(fontsize=10)
-plt.show()
+# plt.xlabel('Wind Direction')
+# plt.ylabel('Frequency')
+# plt.title('Histogram and Respective Distribution PDF line of Wind Directions at Different Heights SEPT 19 2026')
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
 
 ##########################################################################################
 #histogram and PDF line for temperature
@@ -669,3 +669,38 @@ corr_matrix_wind = np.corrcoef(wind_speed_dir_data)
 # plt.show()
 
 ######################
+# Bivariate (2D) gaussian joint PDF of wind speed and temperature at each height, overlaid on the raw scatter
+height_data = {
+    '2m': (wind_sp2, temp2, 'b'),
+    '50m': (wind_sp50, temp50, 'g'),
+    '80m': (wind_sp80, temp80, 'r'),
+}
+
+fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=False, sharey=False)
+
+for ax, (label, (wind_sp, temp, color)) in zip(axes, height_data.items()):
+    wind_sp = np.asarray(wind_sp).ravel()
+    temp = np.asarray(temp).ravel()
+    valid = ~(np.isnan(wind_sp) | np.isnan(temp))
+    wind_sp, temp = wind_sp[valid], temp[valid]
+
+    mean = np.array([np.mean(wind_sp), np.mean(temp)])
+    cov_matrix = np.cov(np.array([wind_sp, temp]))
+    joint_pdf = multivariate_normal(mean=mean, cov=cov_matrix)
+
+    # build a grid spanning the data range to evaluate the joint PDF over
+    x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
+    y = np.linspace(temp.min(), temp.max(), 100)
+    X, Y = np.meshgrid(x, y)
+    Z = joint_pdf.pdf(np.dstack((X, Y)))
+
+    ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
+    ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
+    ax.set_xlabel(f'Wind Speed @ {label}')
+    ax.set_ylabel(f'Temperature @ {label}')
+    ax.set_title(f'Joint PDF @ {label}', fontsize=10)
+    ax.grid(True, linestyle='--', alpha=0.5)
+
+fig.suptitle('Bivariate Gaussian Joint PDF of Wind Speed and Temperature at Different Heights SEPT 19 2026')
+plt.tight_layout()
+plt.show()
