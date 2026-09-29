@@ -460,7 +460,7 @@ post_TI80 = ds2['Turbulence Intensity @ 80m']
 ####################################################################################
 #Start the devlopment of pdf for the features of the atmosphere and the wind
 
-#Create a histogram of the frequency of the wind speeds at different heights
+# Create a histogram of the frequency of the wind speeds at different heights
 # plt.figure(figsize=(12, 6))
 # plt.hist(wind_sp2, bins=30, color='b', alpha=0.6, label='Wind Speed @ 2m')
 # plt.hist(wind_sp5, bins=30, color='c', alpha=0.6, label='Wind Speed @ 5m')
@@ -472,13 +472,13 @@ post_TI80 = ds2['Turbulence Intensity @ 80m']
 # #distribution pdf line for the wind speeds
 # for wind_sp, color in zip([wind_sp2, wind_sp5, wind_sp10, wind_sp20, wind_sp50, wind_sp80], ['b', 'c', 'm', 'y', 'g', 'r']):
 #     wind_sp = np.asarray(wind_sp).ravel()  # convert xarray DataArray to a plain 1D numpy array
-#     sp_mean = np.nanmean(wind_sp)
-#     sp_std = np.nanstd(wind_sp)
-#     sp_dist = norm(sp_mean, sp_std)
+#     wind_sp = wind_sp[~np.isnan(wind_sp)]  # remove NaN values
 #     sp_min = np.nanmin(wind_sp)
 #     sp_max = np.nanmax(wind_sp)
+#     #KDE follows the distribution of the wind speeds
+#     wind_sp_kde = gaussian_kde(wind_sp)
 #     x = np.linspace(sp_min, sp_max, 1000)
-#     plt.plot(x, sp_dist.pdf(x) * len(wind_sp) * (sp_max - sp_min) / 30, c=color, lw=2)
+#     plt.plot(x, wind_sp_kde(x) * len(wind_sp) * (sp_max - sp_min) / 30, c=color, lw=2)
 
 
 # plt.xlabel('Wind Speed')
@@ -491,32 +491,34 @@ post_TI80 = ds2['Turbulence Intensity @ 80m']
 
 ########################################################################
 #historogram and PDF line for wind direction
-# plt.figure(figsize=(12, 6))
-# plt.hist(wind_dir2, bins=15, color='b', alpha=0.6, label='Wind Direction @ 2m')
-# plt.hist(wind_dir5, bins=15, color='c', alpha=0.6, label='Wind Direction @ 5m')
-# plt.hist(wind_dir10, bins=15, color='m', alpha=0.6, label='Wind Direction @ 10m')
-# plt.hist(wind_dir20, bins=15, color='y', alpha=0.6, label='Wind Direction @ 20m')
-# plt.hist(wind_dir50, bins=15, color='g', alpha=0.6, label='Wind Direction @ 50m')
-# plt.hist(wind_dir80, bins=15, color='r', alpha=0.6, label='Wind Direction @ 80m')
+plt.figure(figsize=(12, 6))
+plt.hist(wind_dir2, bins=15, color='b', alpha=0.6, label='Wind Direction @ 2m')
+plt.hist(wind_dir5, bins=15, color='c', alpha=0.6, label='Wind Direction @ 5m')
+plt.hist(wind_dir10, bins=15, color='m', alpha=0.6, label='Wind Direction @ 10m')
+plt.hist(wind_dir20, bins=15, color='y', alpha=0.6, label='Wind Direction @ 20m')
+plt.hist(wind_dir50, bins=15, color='g', alpha=0.6, label='Wind Direction @ 50m')
+plt.hist(wind_dir80, bins=15, color='r', alpha=0.6, label='Wind Direction @ 80m')
 
-# #distribution pdf line for the wind directions
-# for wind_dir, color in zip([wind_dir2, wind_dir5, wind_dir10, wind_dir20, wind_dir50, wind_dir80], ['b', 'c', 'm', 'y', 'g', 'r']):
-#     wind_dir = np.asarray(wind_dir).ravel()  # convert xarray DataArray to a plain 1D numpy array
-#     dir_mean = np.nanmean(wind_dir)
-#     dir_std = np.nanstd(wind_dir)
-#     dir_dist = norm(dir_mean, dir_std)
-#     dir_min = np.nanmin(wind_dir)
-#     dir_max = np.nanmax(wind_dir)
-#     x = np.linspace(dir_min, dir_max, 1000)
-#     plt.plot(x, dir_dist.pdf(x) * len(wind_dir) * (dir_max - dir_min) / 15, c=color, lw=2)
+#distribution pdf line for the wind directions
+for wind_dir, color in zip([wind_dir2, wind_dir5, wind_dir10, wind_dir20, wind_dir50, wind_dir80], ['b', 'c', 'm', 'y', 'g', 'r']):
+    wind_dir = np.asarray(wind_dir).ravel()  # convert xarray DataArray to a plain 1D numpy array
+    wind_dir = wind_dir[~np.isnan(wind_dir)]  # remove NaN values
+    #dir_mean = np.nanmean(wind_dir)
+    #dir_std = np.nanstd(wind_dir)
+    #dir_dist = norm(dir_mean, dir_std)
+    dir_kde = gaussian_kde(wind_dir)
+    dir_min = np.nanmin(wind_dir)
+    dir_max = np.nanmax(wind_dir)
+    x = np.linspace(dir_min, dir_max, 1000)
+    plt.plot(x, dir_kde(x) * len(wind_dir) * (dir_max - dir_min) / 15, c=color, lw=2)
 
-# plt.xlabel('Wind Direction')
-# plt.ylabel('Frequency')
-# plt.title('Histogram and Respective Distribution PDF line of Wind Directions at Different Heights SEPT 19 2026')
-# plt.grid(True, linestyle='--', alpha=0.5)
-# plt.tight_layout()
-# plt.legend(fontsize=10)
-# plt.show()
+plt.xlabel('Wind Direction')
+plt.ylabel('Frequency')
+plt.title('Histogram and Respective Distribution PDF line of Wind Directions at Different Heights SEPT 19 2026')
+plt.grid(True, linestyle='--', alpha=0.5)
+plt.tight_layout()
+plt.legend(fontsize=10)
+plt.show()
 
 ##########################################################################################
 #histogram and PDF line for temperature
@@ -527,13 +529,13 @@ post_TI80 = ds2['Turbulence Intensity @ 80m']
 
 # for temp, color in zip([temp2, temp50, temp80], ['b', 'g', 'r']):
 #     temp = np.asarray(temp).ravel()  # convert xarray DataArray to a plain 1D numpy array
-#     temp_mean = np.nanmean(temp)
-#     temp_std = np.nanstd(temp)
-#     temp_dist = norm(temp_mean, temp_std)
+#     temp = temp[~np.isnan(temp)]
 #     temp_min = np.nanmin(temp)
 #     temp_max = np.nanmax(temp)
+#     # KDE follows the actual (possibly skewed/multimodal) shape better than a Gaussian fit
+#     temp_kde = gaussian_kde(temp)
 #     x = np.linspace(temp_min, temp_max, 1000)
-#     plt.plot(x, temp_dist.pdf(x) * len(temp) * (temp_max - temp_min) / 15, c=color, lw=2)
+#     plt.plot(x, temp_kde(x) * len(temp) * (temp_max - temp_min) / 15, c=color, lw=2)
 
 # plt.xlabel('Temperature')
 # plt.ylabel('Frequency')
@@ -649,21 +651,21 @@ corr_matrix_wind = np.corrcoef(wind_speed_dir_data)
 # plt.show()
 
 #try to make a covaraince  confidence ellipe plot of the wind speed and temperature at 80m
-fig, ax = plt.subplots(figsize=(6, 6))
-cov_matrix = np.cov(np.array([wind_sp80, temp80]))
-eigvals, eigvecs = np.linalg.eigh(cov_matrix)
-order = eigvals.argsort()[::-1]
-eigvals, eigvecs = eigvals[order], eigvecs[:, order]
-angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
-width, height = 2 * np.sqrt(eigvals)
-ellipse = Ellipse(xy=(np.mean(wind_sp80), np.mean(temp80)), width=width, height=height, angle=angle, edgecolor='r', fc='None', lw=2)
-ax.add_patch(ellipse)
-ax.scatter(wind_sp80, temp80, s=10)
-ax.set_xlabel('Wind Speed @ 80m')
-ax.set_ylabel('Temperature @ 80m')
-ax.set_title('Covariance Confidence Ellipse of Wind Speed and Temperature @ 80m SEPT 19 2026')
-plt.grid(True, linestyle='--', alpha=0.5)
-plt.tight_layout()
-plt.show()
+# fig, ax = plt.subplots(figsize=(6, 6))
+# cov_matrix = np.cov(np.array([wind_sp80, temp80]))
+# eigvals, eigvecs = np.linalg.eigh(cov_matrix)
+# order = eigvals.argsort()[::-1]
+# eigvals, eigvecs = eigvals[order], eigvecs[:, order]
+# angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
+# width, height = 2 * np.sqrt(eigvals)
+# ellipse = Ellipse(xy=(np.mean(wind_sp80), np.mean(temp80)), width=width, height=height, angle=angle, edgecolor='r', fc='None', lw=2)
+# ax.add_patch(ellipse)
+# ax.scatter(wind_sp80, temp80, s=10)
+# ax.set_xlabel('Wind Speed @ 80m')
+# ax.set_ylabel('Temperature @ 80m')
+# ax.set_title('Covariance Confidence Ellipse of Wind Speed and Temperature @ 80m SEPT 19 2026')
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.show()
 
 ######################
