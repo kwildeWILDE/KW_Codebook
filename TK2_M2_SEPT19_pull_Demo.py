@@ -583,3 +583,5 @@ plt.tight_layout(h_pad=4.0)
 plt.subplots_adjust(hspace=0.4)
 plt.show()
 
+##############################################################
+#try to make a covaraince PDF simulation for wind speed and temperature at different heights to see the correlation and agreement
