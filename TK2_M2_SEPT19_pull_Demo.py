@@ -4,6 +4,7 @@ import pandas as pd
 import xarray as xr 
 import matplotlib.pyplot as plt
 from matplotlib import animation
+from matplotlib.patches import Ellipse
 import os 
 from pathlib import Path
 import matplotlib.dates as mdates
@@ -601,13 +602,68 @@ corr_matrix = np.corrcoef(wind_speed_temp_data)
 wind_speed_dir_data = np.array([wind_sp2, wind_sp50, wind_sp80, wind_dir2, wind_dir50, wind_dir80])
 corr_matrix_wind = np.corrcoef(wind_speed_dir_data)
 
-plt.figure(figsize=(8, 6))
-plt.imshow(corr_matrix_wind, cmap='viridis', interpolation='none')
-plt.colorbar(label='Correlation')
-plt.xticks(ticks=np.arange(6), labels=['Wind 2m', 'Wind 50m', 'Wind 80m', 'Dir 2m', 'Dir 50m', 'Dir 80m'], rotation=45)
-plt.yticks(ticks=np.arange(6), labels=['Wind 2m', 'Wind 50m', 'Wind 80m', 'Dir 2m', 'Dir 50m', 'Dir 80m'])
-plt.title('Correlation Matrix of Wind Speed and Wind Direction at Different Heights SEPT 19 2026', fontsize=10)
+# plt.figure(figsize=(8, 6))
+# plt.imshow(corr_matrix_wind, cmap='viridis', interpolation='none')
+# plt.colorbar(label='Correlation')
+# plt.xticks(ticks=np.arange(6), labels=['Wind 2m', 'Wind 50m', 'Wind 80m', 'Dir 2m', 'Dir 50m', 'Dir 80m'], rotation=45)
+# plt.yticks(ticks=np.arange(6), labels=['Wind 2m', 'Wind 50m', 'Wind 80m', 'Dir 2m', 'Dir 50m', 'Dir 80m'])
+# plt.title('Correlation Matrix of Wind Speed and Wind Direction at Different Heights SEPT 19 2026', fontsize=10)
+# plt.tight_layout()
+# plt.show()
+
+###################################################
+#try to make a covaraince  confidence ellipe plot of the wind speed and temperature at different heights 
+# fig, ax = plt.subplots(figsize=(6, 6))
+# cov_matrix = np.cov(np.array([wind_sp2, temp2]))
+# eigvals, eigvecs = np.linalg.eigh(cov_matrix)
+# order = eigvals.argsort()[::-1]
+# eigvals, eigvecs = eigvals[order], eigvecs[:, order]
+# angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
+# width, height = 2 * np.sqrt(eigvals)
+# ellipse = Ellipse(xy=(np.mean(wind_sp2), np.mean(temp2)), width=width, height=height, angle=angle, edgecolor='r', fc='None', lw=2)
+# ax.add_patch(ellipse)
+# ax.scatter(wind_sp2, temp2, s=10)
+# ax.set_xlabel('Wind Speed @ 2m')
+# ax.set_ylabel('Temperature @ 2m')
+# ax.set_title('Covariance Confidence Ellipse of Wind Speed and Temperature @ 2m SEPT 19 2026')
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.show()
+
+#try to make a covaraince  confidence ellipe plot of the wind speed and temperature at 50m
+# fig, ax = plt.subplots(figsize=(6, 6))
+# cov_matrix = np.cov(np.array([wind_sp50, temp50]))
+# eigvals, eigvecs = np.linalg.eigh(cov_matrix)
+# order = eigvals.argsort()[::-1]
+# eigvals, eigvecs = eigvals[order], eigvecs[:, order]
+# angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
+# width, height = 2 * np.sqrt(eigvals)
+# ellipse = Ellipse(xy=(np.mean(wind_sp50), np.mean(temp50)), width=width, height=height, angle=angle, edgecolor='r', fc='None', lw=2)
+# ax.add_patch(ellipse)
+# ax.scatter(wind_sp50, temp50, s=10)
+# ax.set_xlabel('Wind Speed @ 50m')
+# ax.set_ylabel('Temperature @ 50m')
+# ax.set_title('Covariance Confidence Ellipse of Wind Speed and Temperature @ 50m SEPT 19 2026')
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.show()
+
+#try to make a covaraince  confidence ellipe plot of the wind speed and temperature at 80m
+fig, ax = plt.subplots(figsize=(6, 6))
+cov_matrix = np.cov(np.array([wind_sp80, temp80]))
+eigvals, eigvecs = np.linalg.eigh(cov_matrix)
+order = eigvals.argsort()[::-1]
+eigvals, eigvecs = eigvals[order], eigvecs[:, order]
+angle = np.degrees(np.arctan2(*eigvecs[:, 0][::-1]))
+width, height = 2 * np.sqrt(eigvals)
+ellipse = Ellipse(xy=(np.mean(wind_sp80), np.mean(temp80)), width=width, height=height, angle=angle, edgecolor='r', fc='None', lw=2)
+ax.add_patch(ellipse)
+ax.scatter(wind_sp80, temp80, s=10)
+ax.set_xlabel('Wind Speed @ 80m')
+ax.set_ylabel('Temperature @ 80m')
+ax.set_title('Covariance Confidence Ellipse of Wind Speed and Temperature @ 80m SEPT 19 2026')
+plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.show()
 
-###################################################
+######################
