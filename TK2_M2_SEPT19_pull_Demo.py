@@ -379,22 +379,79 @@ delta_v_50_80 = v80 - v50
 Ri_bulk_2_50 = (9.81 / theta_v_2) * delta_theta_v_2_50 * (50 - 2) / (delta_u_2_50**2 + delta_v_2_50**2)
 Ri_bulk_50_80 = (9.81 / theta_v_50) * delta_theta_v_50_80 * (80 - 50) / (delta_u_50_80**2 + delta_v_50_80**2)
 
+#get the recorded Richardson numbers for further analysis 
+post_Ri_2_50 = ds2['Richardson Number (2-50m)']
+post_Ri_50_80 = ds2['Richardson Number (50-80m)']
 
 #plot the calculated bulk Richardson numbers
-plt.figure(figsize=(12, 6))
-plt.plot(time, np.log(Ri_bulk_2_50), label='Ri_bulk_2_50')
-plt.plot(time, np.log(Ri_bulk_50_80), label='Ri_bulk_50_80')
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, Ri_bulk_2_50,c='b', label='Ri_bulk_2_50')
+# plt.plot(time, Ri_bulk_50_80, c='r', label='Ri_bulk_50_80')
 
-# # #setting up the x-axis to show time in a readable format
+# # # #setting up the x-axis to show time in a readable format
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+
+# #have the plot in a log scale for smoother looking results 
+# plt.yscale ('symlog', linthresh=0.01)
+# plt.xlabel('Time')
+# plt.ylabel('Bulk Richardson Number')
+# plt.title('Calculated Bulk Richardson Number over Time SEPT 19 2026')
+# plt.xticks(rotation=45, fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
+
+#plotting the actual recorded Richardson numbers for comparison
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, post_Ri_2_50, c='purple',ls='--', label='post_Ri_2_50')
+# plt.plot(time, post_Ri_50_80, c='orange',ls='--', label='post_Ri_50_80')
+
+# #setting up the x-axis to show time in a readable format
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+
+# #have the plot in a log scale for smoother looking results 
+# plt.yscale ('symlog', linthresh=0.01)
+# plt.xlabel('Time')
+# plt.ylabel('Recorded Richardson Number')
+# plt.title('Recorded Richardson Number over Time SEPT 19 2026')
+# plt.xticks(rotation=45, fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10)
+# plt.show()
+
+#also show the recorded turbulence intensity for comparison
+post_TI2 = ds2['Turbulence Intensity @ 2m']
+post_TI5 = ds2['Turbulence Intensity @ 5m']
+post_TI10 = ds2['Turbulence Intensity @ 10m']
+post_TI20 = ds2['Turbulence Intensity @ 20m']
+post_TI50 = ds2['Turbulence Intensity @ 50m']
+post_TI80 = ds2['Turbulence Intensity @ 80m']
+
+#plotting the recorded turb intentisity
+plt.figure(figsize=(12, 6))
+plt.plot(time, post_TI2, c='b',ls='--', label='post_TI2')
+plt.plot(time, post_TI5, c='c',ls='--', label='post_TI5')
+plt.plot(time, post_TI10, c='m',ls='--', label='post_TI10')
+plt.plot(time, post_TI20, c='y',ls='--', label='post_TI20')
+plt.plot(time, post_TI50, c='g',ls='--', label='post_TI50')
+plt.plot(time, post_TI80, c='r',ls='--', label='post_TI80')
+
 plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
 plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
 
 plt.xlabel('Time')
-plt.ylabel('Bulk Richardson Number')
-plt.title('Bulk Richardson Number over Time')
+plt.ylabel('Turbulence Intensity')
+plt.title('Recorded Turbulence Intensity Over Time SEPT 19 2026')
 plt.xticks(rotation=45, fontsize=10)
 plt.yticks(fontsize=10)
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
 plt.legend(fontsize=10)
 plt.show()
+
