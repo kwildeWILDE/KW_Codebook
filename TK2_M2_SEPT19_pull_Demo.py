@@ -670,42 +670,42 @@ corr_matrix_wind = np.corrcoef(wind_speed_dir_data)
 
 ######################
 # Bivariate (2D) gaussian joint PDF of wind speed and temperature at each height, overlaid on the raw scatter
-# height_data = {
-#     '2m': (wind_sp2, temp2, 'b'),
-#     '50m': (wind_sp50, temp50, 'g'),
-#     '80m': (wind_sp80, temp80, 'r'),
-# }
+height_data = {
+    '2m': (wind_sp2, temp2, 'b'),
+    '50m': (wind_sp50, temp50, 'g'),
+    '80m': (wind_sp80, temp80, 'r'),
+}
 
-# fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=False, sharey=False)
+fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=False, sharey=False)
 
-# for ax, (label, (wind_sp, temp, color)) in zip(axes, height_data.items()):
-#     wind_sp = np.asarray(wind_sp).ravel()
-#     temp = np.asarray(temp).ravel() #.recvel() is used to flatten a multi-diemsional array into a one dimenaional array
-#     valid = ~(np.isnan(wind_sp) | np.isnan(temp)) #"keep only the row or elements where neither wind_sp nor temp is NaN"
-#     wind_sp, temp = wind_sp[valid], temp[valid] #defining the cleaned arrays with only valid (non-NaN) entries
+for ax, (label, (wind_sp, temp, color)) in zip(axes, height_data.items()):
+    wind_sp = np.asarray(wind_sp).ravel()
+    temp = np.asarray(temp).ravel() #.ravel() is used to flatten a multi-dimensional array into a one dimensional array
+    valid = ~(np.isnan(wind_sp) | np.isnan(temp)) #"keep only the row or elements where neither wind_sp nor temp is NaN"
+    wind_sp, temp = wind_sp[valid], temp[valid] #defining the cleaned arrays with only valid (non-NaN) entries
 
-#     mean = np.array([np.mean(wind_sp), np.mean(temp)]) #the mean vector of wind speed and temperature
-#     cov_matrix = np.cov(np.array([wind_sp, temp])) #making the covariance matrix of wind speed and temperature as an array data structure
-#     joint_pdf = multivariate_normal(mean=mean, cov=cov_matrix) #The joint probability density function 
-                                                # P(wind speed, temperature) of wind speed and temperature
+    mean = np.array([np.mean(wind_sp), np.mean(temp)]) #the mean vector of wind speed and temperature
+    cov_matrix = np.cov(np.array([wind_sp, temp])) #making the covariance matrix of wind speed and temperature as an array data structure
+    joint_pdf = multivariate_normal(mean=mean, cov=cov_matrix) #The joint probability density function 
+                                                #P(wind speed, temperature) of wind speed and temperature
 
-#     # build a grid spanning the data range to evaluate the joint PDF over
-#     x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
-#     y = np.linspace(temp.min(), temp.max(), 100)
-#     X, Y = np.meshgrid(x, y)
-#     Z = joint_pdf.pdf(np.dstack((X, Y))) #taking the mesh grid of X and Y coordinates and evaluating the  
-#                                           #depth of the joint PDF(Z-axis) at each grid point
+    # build a grid spanning the data range to evaluate the joint PDF over
+    x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
+    y = np.linspace(temp.min(), temp.max(), 100)
+    X, Y = np.meshgrid(x, y)
+    Z = joint_pdf.pdf(np.dstack((X, Y))) #taking the mesh grid of X and Y coordinates and evaluating the  
+                                          #depth of the joint PDF(Z-axis) at each grid point
 
-#     ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
-#     ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
-#     ax.set_xlabel(f'Wind Speed @ {label}')
-#     ax.set_ylabel(f'Temperature @ {label}')
-#     ax.set_title(f'Joint PDF @ {label}', fontsize=10)
-#     ax.grid(True, linestyle='--', alpha=0.5)
+    ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
+    ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
+    ax.set_xlabel(f'Wind Speed @ {label}')
+    ax.set_ylabel(f'Temperature @ {label}')
+    ax.set_title(f'Joint PDF @ {label}', fontsize=10)
+    ax.grid(True, linestyle='--', alpha=0.5)
 
-# fig.suptitle('Bivariate Gaussian Joint PDF of Wind Speed and Temperature at Different Heights SEPT 19 2026')
-# plt.tight_layout()
-# plt.show()
+fig.suptitle('Bivariate Gaussian Joint PDF of Wind Speed and Temperature at Different Heights SEPT 19 2026')
+plt.tight_layout()
+plt.show() 
 #############################################################################
 #from the plot above we can see that the that the scatter points outside the outer contour represent extreme 
 # or less likely combinations of wind speed and temperature. 
