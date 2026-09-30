@@ -680,19 +680,21 @@ corr_matrix_wind = np.corrcoef(wind_speed_dir_data)
 
 # for ax, (label, (wind_sp, temp, color)) in zip(axes, height_data.items()):
 #     wind_sp = np.asarray(wind_sp).ravel()
-#     temp = np.asarray(temp).ravel()
-#     valid = ~(np.isnan(wind_sp) | np.isnan(temp))
-#     wind_sp, temp = wind_sp[valid], temp[valid]
+#     temp = np.asarray(temp).ravel() #.recvel() is used to flatten a multi-diemsional array into a one dimenaional array
+#     valid = ~(np.isnan(wind_sp) | np.isnan(temp)) #"keep only the row or elements where neither wind_sp nor temp is NaN"
+#     wind_sp, temp = wind_sp[valid], temp[valid] #defining the cleaned arrays with only valid (non-NaN) entries
 
-#     mean = np.array([np.mean(wind_sp), np.mean(temp)])
-#     cov_matrix = np.cov(np.array([wind_sp, temp]))
-#     joint_pdf = multivariate_normal(mean=mean, cov=cov_matrix)
+#     mean = np.array([np.mean(wind_sp), np.mean(temp)]) #the mean vector of wind speed and temperature
+#     cov_matrix = np.cov(np.array([wind_sp, temp])) #making the covariance matrix of wind speed and temperature as an array data structure
+#     joint_pdf = multivariate_normal(mean=mean, cov=cov_matrix) #The joint probability density function 
+                                                # P(wind speed, temperature) of wind speed and temperature
 
 #     # build a grid spanning the data range to evaluate the joint PDF over
 #     x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
 #     y = np.linspace(temp.min(), temp.max(), 100)
 #     X, Y = np.meshgrid(x, y)
-#     Z = joint_pdf.pdf(np.dstack((X, Y)))
+#     Z = joint_pdf.pdf(np.dstack((X, Y))) #taking the mesh grid of X and Y coordinates and evaluating the  
+#                                           #depth of the joint PDF(Z-axis) at each grid point
 
 #     ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
 #     ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
