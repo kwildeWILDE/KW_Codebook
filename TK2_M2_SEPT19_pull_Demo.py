@@ -4,7 +4,7 @@ import pandas as pd
 import xarray as xr 
 import matplotlib.pyplot as plt
 from matplotlib import animation
-from matplotlib.patches import Ellipse
+from matplotlib.patches import Ellipse, Patch
 import os 
 from pathlib import Path
 import matplotlib.dates as mdates
@@ -670,37 +670,99 @@ corr_matrix_wind = np.corrcoef(wind_speed_dir_data)
 
 ######################
 # Bivariate (2D) gaussian joint PDF of wind speed and temperature at each height, overlaid on the raw scatter
-height_data = {
+# height_data = {
+#     '2m': (wind_sp2, temp2, 'b'),
+#     '50m': (wind_sp50, temp50, 'g'),
+#     '80m': (wind_sp80, temp80, 'r'),
+# }
+
+# fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=False, sharey=False)
+
+# for ax, (label, (wind_sp, temp, color)) in zip(axes, height_data.items()):
+#     wind_sp = np.asarray(wind_sp).ravel()
+#     temp = np.asarray(temp).ravel()
+#     valid = ~(np.isnan(wind_sp) | np.isnan(temp))
+#     wind_sp, temp = wind_sp[valid], temp[valid]
+
+#     mean = np.array([np.mean(wind_sp), np.mean(temp)])
+#     cov_matrix = np.cov(np.array([wind_sp, temp]))
+#     joint_pdf = multivariate_normal(mean=mean, cov=cov_matrix)
+
+#     # build a grid spanning the data range to evaluate the joint PDF over
+#     x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
+#     y = np.linspace(temp.min(), temp.max(), 100)
+#     X, Y = np.meshgrid(x, y)
+#     Z = joint_pdf.pdf(np.dstack((X, Y)))
+
+#     ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
+#     ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
+#     ax.set_xlabel(f'Wind Speed @ {label}')
+#     ax.set_ylabel(f'Temperature @ {label}')
+#     ax.set_title(f'Joint PDF @ {label}', fontsize=10)
+#     ax.grid(True, linestyle='--', alpha=0.5)
+
+# fig.suptitle('Bivariate Gaussian Joint PDF of Wind Speed and Temperature at Different Heights SEPT 19 2026')
+# plt.tight_layout()
+# plt.show()
+#############################################################################
+#from the plot above we can see that the that the scatter points outside the outer contour represent extreme 
+# or less likely combinations of wind speed and temperature. 
+#So lets try to plot a time series of the wind speed and temperature at different heights along the time series to find *when* the extreme 
+# or less likely combinations occur.
+time_series_data = {
     '2m': (wind_sp2, temp2, 'b'),
     '50m': (wind_sp50, temp50, 'g'),
     '80m': (wind_sp80, temp80, 'r'),
 }
 
-fig, axes = plt.subplots(1, 3, figsize=(18, 6), sharex=False, sharey=False)
+x = time
+y1 = (min(wind_sp2.min(), wind_sp50.min(), wind_sp80.min()), max(wind_sp2.max(), wind_sp50.max(), wind_sp80.max()))
+y2 = (min(temp2.min(), temp50.min(), temp80.min()), max(temp2.max(), temp50.max(), temp80.max()))
 
-for ax, (label, (wind_sp, temp, color)) in zip(axes, height_data.items()):
-    wind_sp = np.asarray(wind_sp).ravel()
-    temp = np.asarray(temp).ravel()
-    valid = ~(np.isnan(wind_sp) | np.isnan(temp))
-    wind_sp, temp = wind_sp[valid], temp[valid]
+# half the median sample spacing, used to size the shaded outlier spans below
+half_dt = pd.Series(time).diff().dropna().median() / 2
+outlier_patch = Patch(facecolor='yellow', alpha=0.30, label='Outlier (outside outer PDF contour)')
 
-    mean = np.array([np.mean(wind_sp), np.mean(temp)])
-    cov_matrix = np.cov(np.array([wind_sp, temp]))
+fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+for ax1, (label, (wind_sp, temp, color)) in zip(axes, time_series_data.items()):
+    ax1.plot(x, wind_sp, label=f'Wind Speed @ {label}', color=color, linestyle='--')
+    ax1.set_ylabel('Wind Speed (m/s)')
+    ax1.set_ylim(y1)
+    ax1.grid(True, linestyle='--', alpha=0.5)
+
+    ax2 = ax1.twinx()
+    ax2.plot(x, temp, label=f'Temperature @ {label}', color=color, linestyle='-')
+    ax2.set_ylabel('Temperature (°C)')
+    ax2.set_ylim(y2)
+    ax1.set_title(f'Time Series of Wind Speed and Temperature @ {label}')
+
+    # recompute the same joint PDF used in the bivariate plot to find low-density (outlier) points
+    wind_arr = np.asarray(wind_sp).ravel()
+    temp_arr = np.asarray(temp).ravel()
+    valid = ~(np.isnan(wind_arr) | np.isnan(temp_arr))
+
+    mean = np.array([np.mean(wind_arr[valid]), np.mean(temp_arr[valid])])
+    cov_matrix = np.cov(np.array([wind_arr[valid], temp_arr[valid]]))
     joint_pdf = multivariate_normal(mean=mean, cov=cov_matrix)
+    pdf_vals = joint_pdf.pdf(np.column_stack((wind_arr[valid], temp_arr[valid])))
 
-    # build a grid spanning the data range to evaluate the joint PDF over
-    x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
-    y = np.linspace(temp.min(), temp.max(), 100)
-    X, Y = np.meshgrid(x, y)
-    Z = joint_pdf.pdf(np.dstack((X, Y)))
+    # bottom 5% of density values ~ points falling outside the outer contour in the joint PDF plot
+    outlier_threshold = np.percentile(pdf_vals, 5)
+    outlier_times = np.asarray(x)[valid][pdf_vals < outlier_threshold]
 
-    ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
-    ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
-    ax.set_xlabel(f'Wind Speed @ {label}')
-    ax.set_ylabel(f'Temperature @ {label}')
-    ax.set_title(f'Joint PDF @ {label}', fontsize=10)
-    ax.grid(True, linestyle='--', alpha=0.5)
+    for t in outlier_times:
+        ax1.axvspan(t - half_dt, t + half_dt, color='yellow', alpha=0.30, zorder=0)
 
-fig.suptitle('Bivariate Gaussian Joint PDF of Wind Speed and Temperature at Different Heights SEPT 19 2026')
+    # combine legends from both axes (plus the outlier span) into a single legend
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2 + [outlier_patch], labels1 + labels2 + [outlier_patch.get_label()], loc='upper right')
+
+axes[-1].set_xlabel('Time')
+axes[-1].xaxis.set_major_locator(mdates.HourLocator(interval=2))
+axes[-1].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+plt.setp(axes[-1].get_xticklabels(), rotation=45, fontsize=10)
+
+fig.suptitle('Time Series of Wind Speed and Temperature at Different Heights SEPT 19 2026')
 plt.tight_layout()
 plt.show()
