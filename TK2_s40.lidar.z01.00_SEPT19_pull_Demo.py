@@ -3,6 +3,7 @@ import os
 
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 from matplotlib.patches import Ellipse
 import scipy.stats as stats
 # from scipy.stats import multivariate_normal
@@ -95,8 +96,41 @@ print(ds.head())
 
 # from the xarray the colomum of 'doppler_velocity' is what can be uses as the measured wind speed from the LOS lidar remote sensing method 
 #but the first question is what is the height range of the measurements? 
-print(ds['range'].values)
+#I'm assuminig that the values for 'range' is in meters in height away from the lidar
+#With that for it to becomparable with the M2 data we can just the range heights of 15, 45, and 75 meters. 
+# print(ds['range'].values)
 # The 'range' coordinate represents the height above the lidar instrument at which each gate measurement is taken.
 #also print the time to see if it covers the expected measurement period, as in from 00:00 SEPT 19 to 23:59 SEPT 19
-print('#########################') 
-print(ds['time'].values)
+#Good new that the time is around the expected measurement period
+# print('#########################') 
+# print(ds['time'].values)
+
+# attempt to plot the doppler velocity at the specified range heights
+
+#Convert MST into an apporite data format for plotting
+#need to fix the conversion of MST to datetime, ensuring the format matches the actual data in the 'DATE (MM/DD/YYYY)' and 'MST' columns
+ds['datetime'] = pd.to_datetime(ds['DATE (MM/DD/YYYY)'].astype(str) + ' ' + ds['MST'].astype(str))
+time = ds['datetime']
+
+range_heights = [15, 45, 75]
+
+fig, ax = plt.subplots(1,3,figsize=(10, 6))
+
+for h in range_heights:
+    gate_idx = np.argmin(np.abs(ds['range'].values - h))
+    ax[range_heights.index(h)].plot(time, ds['doppler_velocity'].values[:, gate_idx], label=f'{h} m')
+    # #setting up the x-axis to show time in a readable format
+    # ax[range_heights.index(h)].xaxis.set_major_locator(mdates.HourLocator(interval=2))
+    # ax[range_heights.index(h)].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+
+for i, h in enumerate(range_heights):
+    ax[i].set_title(f'Doppler Velocity at {h} m')
+    ax[i].set_xlabel('Time')
+    ax[i].set_ylabel('Doppler Velocity (m/s)')
+    ax[i].legend()
+plt.show()
+# Rotate x-axis labels for better readability
+for ax_i in ax:
+    plt.sca(ax_i)
+    plt.xticks(rotation=45)
+plt.tight_layout()
