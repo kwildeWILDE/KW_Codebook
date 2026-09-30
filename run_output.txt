@@ -1,0 +1,20 @@
+START
+STDOUT:
+<xarray.Dataset> Size: 1kB
+Dimensions:           (time: 5, range: 5)
+Coordinates:
+  * time              (time) datetime64[ns] 40B 2026-09-19T00:00:20.109996 .....
+  * range             (range) float64 40B 15.0 45.0 75.0 105.0 135.0
+Data variables:
+    azimuth           (time) float64 40B 360.0 72.01 144.0 216.0 288.0
+    elevation         (time) float64 40B 45.0 45.0 45.0 45.0 45.0
+    pitch             (time) float64 40B -0.06 -0.06 -0.06 -0.06 -0.06
+    roll              (time) float64 40B -0.05 -0.05 -0.05 -0.05 -0.05
+    doppler_velocity  (time, range) float64 200B -0.688 8.026 ... -7.568 -7.568
+    intensity         (time, range) float64 200B 1.014 0.9941 ... 1.011 1.014
+    beta              (time, range) float64 200B 7.811e-07 ... 7.702e-07
+    spectral_width    (time, range) float64 200B 0.0764 0.0764 ... 5.427 5.427
+
+STDERR:
+
+RC:0
