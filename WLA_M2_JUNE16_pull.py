@@ -95,26 +95,54 @@ wind_dir20 = ds['Avg Wind Direction @ 20m [deg]']
 wind_dir50 = ds['Avg Wind Direction @ 50m [deg]']
 wind_dir80 = ds['Avg Wind Direction @ 80m [deg]']
 
+# plt.figure(figsize=(12, 6))
+# plt.plot(time, wind_dir2, label='Wind Direction @ 2m [deg]', color='blue')
+# plt.plot(time, wind_dir5, label='Wind Direction @ 5m [deg]', color='cyan')
+# plt.plot(time, wind_dir10, label='Wind Direction @ 10m [deg]', color='magenta')
+# plt.plot(time, wind_dir20, label='Wind Direction @ 20m [deg]', color='yellow')
+# plt.plot(time, wind_dir50, label='Wind Direction @ 50m [deg]', color='green')
+# plt.plot(time, wind_dir80, label='Wind Direction @ 80m [deg]', color='red')
+
+# #setting up the x-axis to show time in a readable format
+# plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
+# plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+
+# plt.xlabel('Time')
+# plt.ylabel('Wind Direction [deg]')
+# plt.title('Wind Direction Over Time JUNE 16 2026')
+# plt.xticks(rotation=45, fontsize=10)
+# plt.yticks(fontsize=10)
+# plt.grid(True, linestyle='--', alpha=0.5)
+# plt.tight_layout()
+# plt.legend(fontsize=10, loc='lower right')
+# plt.show()
+#########################################################
+# create the histogam and pdf line for the temperature at different heights 
 plt.figure(figsize=(12, 6))
-plt.plot(time, wind_dir2, label='Wind Direction @ 2m [deg]', color='blue')
-plt.plot(time, wind_dir5, label='Wind Direction @ 5m [deg]', color='cyan')
-plt.plot(time, wind_dir10, label='Wind Direction @ 10m [deg]', color='magenta')
-plt.plot(time, wind_dir20, label='Wind Direction @ 20m [deg]', color='yellow')
-plt.plot(time, wind_dir50, label='Wind Direction @ 50m [deg]', color='green')
-plt.plot(time, wind_dir80, label='Wind Direction @ 80m [deg]', color='red')
+plt.hist(temp2, bins=15, color='b', alpha=0.6, label='Temperature @ 2m')
+plt.hist(temp50, bins=15, color='g', alpha=0.6, label='Temperature @ 50m')
+plt.hist(temp80, bins=15, color='r', alpha=0.6, label='Temperature @ 80m')
 
-#setting up the x-axis to show time in a readable format
-plt.gca().xaxis.set_major_locator(mdates.HourLocator(interval=2))
-plt.gca().xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+for temp, color in zip([temp2, temp50, temp80], ['b', 'g', 'r']):
+    temp = np.asarray(temp).ravel()  # convert xarray DataArray to a plain 1D numpy array
+    temp = temp[~np.isnan(temp)]
+    temp_min = np.nanmin(temp)
+    temp_max = np.nanmax(temp)
+    # KDE follows the actual (possibly skewed/multimodal) shape better than a Gaussian fit
+    #KDE = the kernel density estimate of the temperature distribution
+    temp_kde = gaussian_kde(temp)
+    x = np.linspace(temp_min, temp_max, 1000)
+    plt.plot(x, temp_kde(x) * len(temp) * (temp_max - temp_min) / 15, c=color, lw=2)
 
-plt.xlabel('Time')
-plt.ylabel('Wind Direction [deg]')
-plt.title('Wind Direction Over Time JUNE 16 2026')
-plt.xticks(rotation=45, fontsize=10)
-plt.yticks(fontsize=10)
+plt.xlabel('Temperature')
+plt.ylabel('Frequency')
+plt.title('Histogram and Respective Distribution PDF line of Temperatures at Different Heights JUNE 16 2026')
 plt.grid(True, linestyle='--', alpha=0.5)
 plt.tight_layout()
-plt.legend(fontsize=10, loc='lower right')
+plt.legend(fontsize=10)
 plt.show()
-#########################################################
-
+###################################SCRAPPED BECAUSE THE TEMPERATURES ARE NO REALISTIC VALUES#####################################
+## Possible Reason why the temperatures at 80M are hywire; 
+## 1. The temperatures at 80m is well below the dew point temperature so the moisture of the air may have condensed might have causing the temperture to be measured as lower than it actually is.
+## 2. There could be sensor calibration issues or errors in the data acquisition system at that height.
+## 3. Localized microclimatic effects, such as shading or wind patterns, might have influenced the temperature readings at 80m.
