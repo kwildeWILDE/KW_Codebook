@@ -82,17 +82,41 @@ colors_wd = ['b', 'g', 'r']  # Assign a color to each selected height
 print("Selected Heights for Wind Direction:", ds_sel_wd["height"].values)
 
 # Plot the MST time series of wind direction for each selected height
+# fig, ax = plt.subplots(figsize=(12, 6))
+# for h, c in zip(ds_sel_wd["height"].values, colors_wd):
+#     ax.plot(ds_sel_wd["time"].values, ds_sel_wd["WD"].sel(height=h).values, label=f"Height {h} m", color=c)
+# ax.set_xlabel("Time (MST), May 2 2026")
+# ax.set_ylabel("Wind Direction (degrees)")
+# ax.set_title("Wind Direction Time Series at Selected Heights (MST)")
+# ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+# ax.grid(True, linestyle='--', alpha=0.5)
+# ax.legend()
+# plt.tight_layout()
+# plt.show()
+
+###################################### 
+# SIKE make the hitogram of the frequencies of wind speed with the fitted KDE pdf line for the difffernt heights
+
+from scipy.stats import gaussian_kde
+
+# All heights on one axes: shared bin edges, semi-transparent bars so overlapping bins stay visible
 fig, ax = plt.subplots(figsize=(12, 6))
-for h, c in zip(ds_sel_wd["height"].values, colors_wd):
-    ax.plot(ds_sel_wd["time"].values, ds_sel_wd["WD"].sel(height=h).values, label=f"Height {h} m", color=c)
-ax.set_xlabel("Time (MST), May 2 2026")
-ax.set_ylabel("Wind Direction (degrees)")
-ax.set_title("Wind Direction Time Series at Selected Heights (MST)")
-ax.xaxis.set_major_formatter(mdates.DateFormatter('%H:%M'))
+ws_by_height = {h: ds_sel["WS"].sel(height=h).values for h in ds_sel["height"].values}
+ws_by_height = {h: d[~np.isnan(d)] for h, d in ws_by_height.items()}
+all_ws = np.concatenate(list(ws_by_height.values()))
+bins = np.linspace(all_ws.min(), all_ws.max(), 15)
+x = np.linspace(all_ws.min(), all_ws.max(), 1000)
+
+for (h, data), c in zip(ws_by_height.items(), colors):
+    ax.hist(data, bins=bins, density=True, color=c, alpha=0.3, edgecolor=c, label=f"{h} m (n={data.size})")
+    ax.plot(x, gaussian_kde(data)(x), color=c, lw=2)
+
+ax.set_xlabel("Wind Speed (m/s)")
+ax.set_ylabel("Frequency Density")
+ax.set_title(" s40.lidar.z01.c1 Wind Speed Distribution with KDE at Selected Heights (MST)")
 ax.grid(True, linestyle='--', alpha=0.5)
-ax.legend()
+ax.legend(title="Height")
 plt.tight_layout()
 plt.show()
 
-###################################### 
-# End of WLA s40.lidar.z01.c1_MAY02_2026_pull basic code analysis 
+#############################
