@@ -75,7 +75,7 @@ temp_good = ds_selected_mst["temperature"].where(quality_mask)
 time_mst = ds_selected_mst["time"].values - np.timedelta64(7, 'h')
 
 ## Reprint the list of valid heights with temperature data after applying the quality mask within the time range of March 25, 2026 (MST)
-temp_good_march25 = temp_good.sel(time=slice("2026-03-25T00:00", "2026-03-26T00:00"))
+temp_good_march25 = temp_good  # already limited to March 25 MST
 valid_temp_good_mask = ~np.isnan(temp_good_march25.values)
 valid_height_indices_good = np.any(valid_temp_good_mask, axis=0).nonzero()[0]
 valid_heights_good = height_m[valid_height_indices_good]
@@ -89,18 +89,44 @@ for h, f in zip(valid_heights_good, height_frequency_good):
 specific_heights_m = np.array([0, 10, 46, 61, 77, 95])
 colors = ['royalblue', 'mediumslateblue', 'springgreen', 'limegreen', 'gold', 'tomato']
 
-fig, ax = plt.subplots(figsize=(12, 6))
-for h, color in zip(specific_heights_m, colors):
-    idx = np.abs(height_m - h).argmin()
-    ax.plot(time_mst, temp_good.values[:, idx], color=color, label=f"{height_m[idx]:.0f} m")
-ax.set_title("s40.assist.tropoe.z01.c0 Quality-masked Temperature, March 25, 2026 (MST)")
-ax.set_xlabel("Time (MST)")
-ax.set_xlim(np.datetime64("2026-03-25T00:00"), np.datetime64("2026-03-26T00:00"))
-ax.set_ylabel("Temperature (C)")
-ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-ax.grid(True)
-ax.legend(title="Height")
+# fig, ax = plt.subplots(figsize=(12, 6))
+# for h, color in zip(specific_heights_m, colors):
+#     idx = np.abs(height_m - h).argmin()
+#     ax.plot(time_mst, temp_good.values[:, idx], color=color, label=f"{height_m[idx]:.0f} m")
+# ax.set_title("s40.assist.tropoe.z01.c0 Quality-masked Temperature, March 25, 2026 (MST)")
+# ax.set_xlabel("Time (MST)")
+# ax.set_xlim(np.datetime64("2026-03-25T00:00"), np.datetime64("2026-03-26T00:00"))
+# ax.set_ylabel("Temperature (C)")
+# ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+# ax.grid(True)
+# ax.legend(title="Height")
+# fig.tight_layout()
+# plt.show()
+
+#################################
+# Make a histogram  with a KDE pdf line overlayed of the frequency of valid temperature data at each height for March 25, 2026 (MST)
+# one panel per height, same bins/axes so the distributions match the time series above
+heights_idx = [np.abs(height_m - h).argmin() for h in specific_heights_m]
+data_by_height = []
+for idx in heights_idx:
+    d = temp_good_march25.values[:, idx]
+    data_by_height.append(d[~np.isnan(d)])
+all_t = np.concatenate(data_by_height)
+bins = np.linspace(all_t.min(), all_t.max(), 20)
+x = np.linspace(all_t.min(), all_t.max(), 500)
+
+fig, axes = plt.subplots(2, 3, figsize=(14, 7), sharex=True, sharey=True)
+for ax, idx, data, c in zip(axes.flat, heights_idx, data_by_height, colors):
+    ax.hist(data, bins=bins, density=True, color=c, alpha=0.4, edgecolor='white')
+    ax.plot(x, gaussian_kde(data)(x), color=c, lw=2)
+    ax.set_title(f"{height_m[idx]:.0f} m (n={data.size})", fontsize=10)
+    ax.grid(True, linestyle='--', alpha=0.4)
+for ax in axes[1]:
+    ax.set_xlabel("Temperature (C)")
+for ax in axes[:, 0]:
+    ax.set_ylabel("Density")
+fig.suptitle("s40.assist.tropoe.z01.c0 Quality-masked Temperature Distribution, March 25, 2026 (MST)")
 fig.tight_layout()
 plt.show()
 
-#################################
+##############################################
