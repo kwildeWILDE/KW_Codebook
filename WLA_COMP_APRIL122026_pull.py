@@ -207,12 +207,300 @@ x = np.linspace(all_t.min(), all_t.max(), 500)
 time_idx = np.abs(time_mst - np.datetime64("2026-04-12T06:30")).argmin()
 temp_profile = temp_good.values[time_idx, :]
 
-fig, ax = plt.subplots(figsize=(8, 11.5))
-ax.plot(temp_profile, height_m, marker='o', linestyle='-')
-ax.set_xlabel("Temperature (°C)")
-ax.set_ylabel("Height (m)")
-ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 6:30 MST, April 12, 2026")
-ax.grid(True, linestyle='--', alpha=0.4)
-fig.tight_layout()
-plt.show()
+# fig, ax = plt.subplots(figsize=(8, 11.5))
+# ax.plot(temp_profile, height_m, marker='o', linestyle='-')
+# ax.set_xlabel("Temperature (°C)")
+# ax.set_ylabel("Height (m)")
+# ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 6:30 MST, April 12, 2026")
+# ax.grid(True, linestyle='--', alpha=0.4)
+# fig.tight_layout()
+# plt.show()
 ####################################################
+####################################################
+###################################################
+
+################ WIND ANALYSIS SECTION ################ 
+
+######## PULLING DATA FROM THE S40.LIDAR.Z01.C1 ############
+
+dp_z01 = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/WDH_Data/corsair/s40.lidar.z01.c1/order_e7b809590267433291bc26e24"
+
+#collect every NetCDF file in the directory, in order
+nc_files_z01 = sorted(glob.glob(f"{dp_z01}/*.nc"))
+if not nc_files_z01:
+    raise FileNotFoundError(f"No NetCDF files found in directory: {dp_z01}")
+
+#each file has a time cordinate, so combine them directly along it. 
+ds_z01 = xr.open_mfdataset(nc_files_z01, combine='by_coords').sortby("time")
+
+########## PULLING DATA FROM THE S40.LIDAR.Z02.C0 ############
+
+dp_z02 = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/WDH_Data/corsair/s40.lidar.z02.c0/order_98bff4ba10b94fe2b046a64f3"
+
+#collect every NetCDF file in the directory, in order
+nc_files_z02 = sorted(glob.glob(f"{dp_z02}/*.nc"))
+if not nc_files_z02:
+    raise FileNotFoundError(f"No NetCDF files found in directory: {dp_z02}")
+
+#each file has a time cordinate, so combine them directly along it. 
+ds_z02 = xr.open_mfdataset(nc_files_z02, combine='by_coords').sortby("time")
+
+###########################################################################################
+#With the datasets from the M2, ds_z01 and ds_z02, we can now proceed with wind analysis.
+
+# Align the datasets along the time coordinate
+#for April 12, 2026 00:00 MST to April 12, 2026 23:59 MST
+#however the time in datasets z01 and z02 are in UTC while M2 is in MST, so we need to convert the z01 and z02 times to MST
+#MST is a fixed UTC-7 (no daylight saving). xarray times are tz-naive UTC, so shift them by -7 h
+#and keep everything tz-naive MST so the three datasets share the same time axis.
+
+# Convert df_m2 to a datetime index if it's not already
+df_m2['time'] = pd.to_datetime(df_m2['datetime'])
+df_m2.set_index('time', inplace=True)
+
+def utc_to_mst(ds):
+	ds = ds.assign_coords(time=ds["time"].to_index() - pd.Timedelta(hours=7))
+	return ds.sortby("time")
+
+ds_z01_mst = utc_to_mst(ds_z01)
+ds_z02_mst = utc_to_mst(ds_z02)
+
+# Restrict to April 12, 2026 (MST)
+day_start, day_end = pd.Timestamp("2026-04-12 00:00"), pd.Timestamp("2026-04-12 23:59:59")
+df_m2 = df_m2.loc[day_start:day_end]
+ds_z01_mst = ds_z01_mst.sel(time=slice(day_start, day_end))
+ds_z02_mst = ds_z02_mst.sel(time=slice(day_start, day_end))
+
+# Interpolate the lidar data onto the M2 timestamps (NaN outside each lidar's coverage)
+ds_z01_interp = ds_z01_mst.interp(time=df_m2.index)
+ds_z02_interp = ds_z02_mst.interp(time=df_m2.index)
+
+#print the times 
+print("M2 times (MST):", df_m2.index)
+print("S40.LIDAR.Z01.C1 times (MST):", ds_z01_interp.time.values)
+print("S40.LIDAR.Z02.C0 times (MST):", ds_z02_interp.time.values)
+
+##########################################################################################
+#Now note that the three datasets (M2, Z01, Z02) are all aligned in time (MST) and can be compared directly.
+
+
+# Heights that have at least one valid (non-NaN) wind speed on April 12 (MST) for ds_z01
+valid_counts_z01 = ds_z01_interp["WS"].notnull().sum("time").compute()
+valid_heights_z01 = valid_counts_z01.where(valid_counts_z01 > 0, drop=True)
+print(f"Heights with valid wind speed for Z01 ({valid_heights_z01.size} of {ds_z01_interp.sizes['height']}):")
+print("Lowest valid height:", int(valid_heights_z01["height"].min()), "m | Highest:", int(valid_heights_z01["height"].max()), "m")
+print(pd.DataFrame({"height_m": valid_heights_z01["height"].values, "valid_samples": valid_heights_z01.values.astype(int)}).to_string(index=False))
+
+# Heights that have at least one valid (non-NaN) wind speed on April 12 (MST) for ds_z02
+valid_counts_z02 = ds_z02_interp["wind_speed"].notnull().sum("time").compute()
+valid_heights_z02 = valid_counts_z02.where(valid_counts_z02 > 0, drop=True)
+print(f"Heights with valid wind speed for Z02 ({valid_heights_z02.size} of {ds_z02_interp.sizes['distance']}):")
+print("Lowest valid height:", int(valid_heights_z02["distance"].min()), "m | Highest:", int(valid_heights_z02["distance"].max()), "m")
+print(pd.DataFrame({"height_m": valid_heights_z02["distance"].values, "valid_samples": valid_heights_z02.values.astype(int)}).to_string(index=False))
+
+
+
+
+
+#However, the dataset have valid data at differnt heights , so select the desired heights for each of the datasets
+dh_m2 = [2, 50, 80] #in meters 
+dh_z01 = [120,160,200] #in meters  
+dh_z02 =  [40,60,80]  #in meters
+
+colors = ['b', 'g', 'r']
+
+#Now that we have matching times and desiered heits for the datasets, we can try to make time seriers comparisons of the wind data. 
+
+#Make a time seriers of the wind speed at the desired heigts for each respective dataset in their own subplots 
+# but same time axis to see the agreement
+import matplotlib.pyplot as plt
+
+# fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+# # M2 wind speed at desired heights
+# for h in dh_m2:
+# 	axes[0].plot(df_m2.index, df_m2[f"Avg Wind Speed @ {h}m [m/s]"], label=f"{h} m", color=colors[dh_m2.index(h)])
+# axes[0].set_title("M2 Wind Speed at Desired Heights April 12, 2026")
+# axes[0].set_ylabel("Wind Speed (m/s)")
+# axes[0].legend()
+# axes[0].grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# # Z01 wind speed at desired heights
+# for h in dh_z01:
+# 	axes[1].plot(ds_z01_interp.time.values, ds_z01_interp[f"WS"].sel(height=h), label=f"{h} m", color=colors[dh_z01.index(h)])
+# axes[1].set_title("S40.LIDAR.Z01.C1 Wind Speed at Desired Heights April 12, 2026")
+# axes[1].set_ylabel("Wind Speed (m/s)")
+# axes[1].legend()
+# axes[1].grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# # Z02 wind speed at desired heights
+# for h in dh_z02:
+# 	axes[2].plot(ds_z02_interp.time.values, ds_z02_interp[f"wind_speed"].sel(distance=h), label=f"{h} m", color=colors[dh_z02.index(h)])
+# axes[2].set_title("S40.LIDAR.Z02.C0 Wind Speed at Desired Heights April 12, 2026")
+# axes[2].set_ylabel("Wind Speed (m/s)")
+# axes[2].set_xlabel("Time (MST)")
+# axes[2].legend()
+# axes[2].grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+# plt.tight_layout()
+# plt.show()
+
+####################################
+# Do the same time sereies analysis for wind direction for each respective dataset in their own subplots 
+# but same time axis to see the agreement
+# fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+# # M2 wind direction at desired heights
+# for h in dh_m2:
+# 	axes[0].plot(df_m2.index, df_m2[f"Avg Wind Direction @ {h}m [deg]"], label=f"{h} m", color=colors[dh_m2.index(h)])
+# axes[0].set_title("M2 Wind Direction at Desired Heights April 12, 2026")
+# axes[0].set_ylabel("Wind Direction (deg)")
+# axes[0].legend()
+# axes[0].grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# # Z01 wind direction at desired heights
+# for h in dh_z01:
+# 	axes[1].plot(ds_z01_interp.time.values, ds_z01_interp[f"WD"].sel(height=h), label=f"{h} m", color=colors[dh_z01.index(h)])
+# axes[1].set_title("S40.LIDAR.Z01.C1 Wind Direction at Desired Heights April 12, 2026")
+# axes[1].set_ylabel("Wind Direction (deg)")
+# axes[1].legend()
+# axes[1].grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# # Z02 wind direction at desired heights
+# for h in dh_z02:
+# 	axes[2].plot(ds_z02_interp.time.values, ds_z02_interp[f"wind_direction"].sel(distance=h), label=f"{h} m", color=colors[dh_z02.index(h)])
+# axes[2].set_title("S40.LIDAR.Z02.C0 Wind Direction at Desired Heights April 12, 2026")
+# axes[2].set_ylabel("Wind Direction (deg)")
+# axes[2].set_xlabel("Time (MST)")
+# axes[2].legend()
+# axes[2].grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# plt.grid(True, which='both', linestyle='--', linewidth=0.5)
+# plt.tight_layout()
+# plt.show()
+############################################################################## 
+# Make a frequency hitogram and KDE pdf line for the wind speeds between the datasets M2, Z01, and Z02
+# on the same plot for comparison
+
+# fig, (ax_m2, ax_z01, ax_z02) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+# # M2 wind speed histogram and KDE
+# ax = ax_m2
+# for h in dh_m2:
+# 	wind_sp = np.asarray(df_m2[f"Avg Wind Speed @ {h}m [m/s]"]).ravel()
+# 	wind_sp = wind_sp[~np.isnan(wind_sp)]
+# 	ax.hist(wind_sp, bins=30, density=True, label=f"M2 {h} m (n = {wind_sp.size})", color=colors[dh_m2.index(h)],alpha =0.6, histtype="step")
+# 	## KDE pdf line for m2
+# 	# #distribution pdf line for the wind speeds
+# 	#distribution pdf line for the wind speeds
+# 	sp_min = np.nanmin(wind_sp)
+# 	sp_max = np.nanmax(wind_sp)
+# 	#KDE follows the distribution of the wind speeds
+# 	wind_sp_kde = gaussian_kde(wind_sp)
+# 	x = np.linspace(sp_min, sp_max, 1000)
+# 	ax.plot(x, wind_sp_kde(x), color=colors[dh_m2.index(h)])
+# ax_m2.set_title("M2 Wind Speed Distribution April 12, 2026")
+# ax_m2.set_ylabel("Density")
+# ax_m2.legend()
+# ax_m2.grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# # Z01 wind speed histogram and KDE
+# ax = ax_z01
+# for h in dh_z01:
+# 	wind_sp = np.asarray(ds_z01_interp[f"WS"].sel(height=h)).ravel()
+# 	wind_sp = wind_sp[~np.isnan(wind_sp)]
+# 	ax.hist(wind_sp, bins=30, density=True, label=f"Z01 {h} m (n = {wind_sp.size})", color=colors[dh_z01.index(h)], alpha=0.6, histtype="step")
+# 	## KDE pdf line for Z01
+# 	sp_min = np.nanmin(wind_sp)
+# 	sp_max = np.nanmax(wind_sp)
+# 	wind_sp_kde = gaussian_kde(wind_sp)
+# 	x = np.linspace(sp_min, sp_max, 1000)
+# 	ax.plot(x, wind_sp_kde(x), color=colors[dh_z01.index(h)])
+# ax_z01.set_title("S40.LIDAR.Z01.C1 Wind Speed Distribution April 12, 2026")
+# ax_z01.set_ylabel("Density")
+# ax_z01.legend()
+# ax_z01.grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# # Z02 wind speed histogram and KDE
+# ax = ax_z02
+# for h in dh_z02:
+# 	wind_sp = np.asarray(ds_z02_interp[f"wind_speed"].sel(distance=h)).ravel()
+# 	wind_sp = wind_sp[~np.isnan(wind_sp)]
+# 	ax.hist(wind_sp, bins=30, density=True, label=f"Z02 {h} m (n = {wind_sp.size})", color=colors[dh_z02.index(h)], alpha=0.6, histtype="step")
+# 	## KDE pdf line for Z02
+# 	sp_min = np.nanmin(wind_sp)
+# 	sp_max = np.nanmax(wind_sp)
+# 	wind_sp_kde = gaussian_kde(wind_sp)
+# 	x = np.linspace(sp_min, sp_max, 1000)
+# 	ax.plot(x, wind_sp_kde(x), color=colors[dh_z02.index(h)])
+# ax_z02.set_title("S40.LIDAR.Z02.C0 Wind Speed Distribution April 12, 2026")
+# ax_z02.set_ylabel("Density")
+# ax_z02.set_xlabel("Wind Speed (m/s)")
+# ax_z02.legend()
+# ax_z02.grid(True, which='both', linestyle='--', linewidth=0.5)
+# plt.tight_layout()
+# plt.show()
+
+##############################################################################
+#make the same histogram and KDE plots for the wind directions between the datasets M2, Z01, and Z02
+#on the same plot for comparison
+fig, (ax_m2, ax_z01, ax_z02) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+
+# M2 wind direction histogram and KDE
+ax = ax_m2
+for h in dh_m2:
+	wind_sp = np.asarray(df_m2[f"Avg Wind Direction @ {h}m [deg]"]).ravel()
+	wind_sp = wind_sp[~np.isnan(wind_sp)]
+	ax.hist(wind_sp, bins=30, density=True, label=f"M2 {h} m (n = {wind_sp.size})", color=colors[dh_m2.index(h)],alpha =0.6, histtype="step")
+	## KDE pdf line for m2
+	# #distribution pdf line for the wind directions
+	#distribution pdf line for the wind directions
+	sp_min = np.nanmin(wind_sp)
+	sp_max = np.nanmax(wind_sp)
+	#KDE follows the distribution of the wind speeds
+	wind_sp_kde = gaussian_kde(wind_sp)
+	x = np.linspace(sp_min, sp_max, 1000)
+	ax.plot(x, wind_sp_kde(x), color=colors[dh_m2.index(h)])
+ax_m2.set_title("M2 Wind Direction Distribution April 12, 2026")
+ax_m2.set_ylabel("Density")
+ax_m2.legend()
+ax_m2.grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# Z01 wind direction histogram and KDE
+ax = ax_z01
+for h in dh_z01:
+	wind_sp = np.asarray(ds_z01_interp[f"WD"].sel(height=h)).ravel()
+	wind_sp = wind_sp[~np.isnan(wind_sp)]
+	ax.hist(wind_sp, bins=30, density=True, label=f"Z01 {h} m (n = {wind_sp.size})", color=colors[dh_z01.index(h)], alpha=0.6, histtype="step")
+	## KDE pdf line for Z01
+	sp_min = np.nanmin(wind_sp)
+	sp_max = np.nanmax(wind_sp)
+	wind_sp_kde = gaussian_kde(wind_sp)
+	x = np.linspace(sp_min, sp_max, 1000)
+	ax.plot(x, wind_sp_kde(x), color=colors[dh_z01.index(h)])
+ax_z01.set_title("S40.LIDAR.Z01.C1 Wind Direction Distribution April 12, 2026")
+ax_z01.set_ylabel("Density")
+ax_z01.legend()
+ax_z01.grid(True, which='both', linestyle='--', linewidth=0.5)
+
+# Z02 wind direction histogram and KDE
+ax = ax_z02
+for h in dh_z02:
+	wind_sp = np.asarray(ds_z02_interp[f"wind_direction"].sel(distance=h)).ravel()
+	wind_sp = wind_sp[~np.isnan(wind_sp)]
+	ax.hist(wind_sp, bins=30, density=True, label=f"Z02 {h} m (n = {wind_sp.size})", color=colors[dh_z02.index(h)], alpha=0.6, histtype="step")
+	## KDE pdf line for Z02
+	sp_min = np.nanmin(wind_sp)
+	sp_max = np.nanmax(wind_sp)
+	wind_sp_kde = gaussian_kde(wind_sp)
+	x = np.linspace(sp_min, sp_max, 1000)
+	ax.plot(x, wind_sp_kde(x), color=colors[dh_z02.index(h)])
+ax_z02.set_title("S40.LIDAR.Z02.C0 Wind Direction Distribution April 12, 2026")
+ax_z02.set_ylabel("Density")
+ax_z02.set_xlabel("Wind Direction (deg)")
+ax_z02.legend()
+ax_z02.grid(True, which='both', linestyle='--', linewidth=0.5)
+plt.tight_layout()
+plt.show()
+
+#########################################################
