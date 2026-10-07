@@ -444,63 +444,125 @@ import matplotlib.pyplot as plt
 ##############################################################################
 #make the same histogram and KDE plots for the wind directions between the datasets M2, Z01, and Z02
 #on the same plot for comparison
-fig, (ax_m2, ax_z01, ax_z02) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+# fig, (ax_m2, ax_z01, ax_z02) = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
 
-# M2 wind direction histogram and KDE
-ax = ax_m2
-for h in dh_m2:
-	wind_sp = np.asarray(df_m2[f"Avg Wind Direction @ {h}m [deg]"]).ravel()
-	wind_sp = wind_sp[~np.isnan(wind_sp)]
-	ax.hist(wind_sp, bins=30, density=True, label=f"M2 {h} m (n = {wind_sp.size})", color=colors[dh_m2.index(h)],alpha =0.6, histtype="step")
-	## KDE pdf line for m2
-	# #distribution pdf line for the wind directions
-	#distribution pdf line for the wind directions
-	sp_min = np.nanmin(wind_sp)
-	sp_max = np.nanmax(wind_sp)
-	#KDE follows the distribution of the wind speeds
-	wind_sp_kde = gaussian_kde(wind_sp)
-	x = np.linspace(sp_min, sp_max, 1000)
-	ax.plot(x, wind_sp_kde(x), color=colors[dh_m2.index(h)])
-ax_m2.set_title("M2 Wind Direction Distribution April 12, 2026")
-ax_m2.set_ylabel("Density")
-ax_m2.legend()
-ax_m2.grid(True, which='both', linestyle='--', linewidth=0.5)
+# # M2 wind direction histogram and KDE
+# ax = ax_m2
+# for h in dh_m2:
+# 	wind_sp = np.asarray(df_m2[f"Avg Wind Direction @ {h}m [deg]"]).ravel()
+# 	wind_sp = wind_sp[~np.isnan(wind_sp)]
+# 	ax.hist(wind_sp, bins=30, density=True, label=f"M2 {h} m (n = {wind_sp.size})", color=colors[dh_m2.index(h)],alpha =0.6, histtype="step")
+# 	## KDE pdf line for m2
+# 	# #distribution pdf line for the wind directions
+# 	#distribution pdf line for the wind directions
+# 	sp_min = np.nanmin(wind_sp)
+# 	sp_max = np.nanmax(wind_sp)
+# 	#KDE follows the distribution of the wind speeds
+# 	wind_sp_kde = gaussian_kde(wind_sp)
+# 	x = np.linspace(sp_min, sp_max, 1000)
+# 	ax.plot(x, wind_sp_kde(x), color=colors[dh_m2.index(h)])
+# ax_m2.set_title("M2 Wind Direction Distribution April 12, 2026")
+# ax_m2.set_ylabel("Density")
+# ax_m2.legend()
+# ax_m2.grid(True, which='both', linestyle='--', linewidth=0.5)
 
-# Z01 wind direction histogram and KDE
-ax = ax_z01
-for h in dh_z01:
-	wind_sp = np.asarray(ds_z01_interp[f"WD"].sel(height=h)).ravel()
-	wind_sp = wind_sp[~np.isnan(wind_sp)]
-	ax.hist(wind_sp, bins=30, density=True, label=f"Z01 {h} m (n = {wind_sp.size})", color=colors[dh_z01.index(h)], alpha=0.6, histtype="step")
-	## KDE pdf line for Z01
-	sp_min = np.nanmin(wind_sp)
-	sp_max = np.nanmax(wind_sp)
-	wind_sp_kde = gaussian_kde(wind_sp)
-	x = np.linspace(sp_min, sp_max, 1000)
-	ax.plot(x, wind_sp_kde(x), color=colors[dh_z01.index(h)])
-ax_z01.set_title("S40.LIDAR.Z01.C1 Wind Direction Distribution April 12, 2026")
-ax_z01.set_ylabel("Density")
-ax_z01.legend()
-ax_z01.grid(True, which='both', linestyle='--', linewidth=0.5)
+# # Z01 wind direction histogram and KDE
+# ax = ax_z01
+# for h in dh_z01:
+# 	wind_sp = np.asarray(ds_z01_interp[f"WD"].sel(height=h)).ravel()
+# 	wind_sp = wind_sp[~np.isnan(wind_sp)]
+# 	ax.hist(wind_sp, bins=30, density=True, label=f"Z01 {h} m (n = {wind_sp.size})", color=colors[dh_z01.index(h)], alpha=0.6, histtype="step")
+# 	## KDE pdf line for Z01
+# 	sp_min = np.nanmin(wind_sp)
+# 	sp_max = np.nanmax(wind_sp)
+# 	wind_sp_kde = gaussian_kde(wind_sp)
+# 	x = np.linspace(sp_min, sp_max, 1000)
+# 	ax.plot(x, wind_sp_kde(x), color=colors[dh_z01.index(h)])
+# ax_z01.set_title("S40.LIDAR.Z01.C1 Wind Direction Distribution April 12, 2026")
+# ax_z01.set_ylabel("Density")
+# ax_z01.legend()
+# ax_z01.grid(True, which='both', linestyle='--', linewidth=0.5)
 
-# Z02 wind direction histogram and KDE
-ax = ax_z02
-for h in dh_z02:
-	wind_sp = np.asarray(ds_z02_interp[f"wind_direction"].sel(distance=h)).ravel()
-	wind_sp = wind_sp[~np.isnan(wind_sp)]
-	ax.hist(wind_sp, bins=30, density=True, label=f"Z02 {h} m (n = {wind_sp.size})", color=colors[dh_z02.index(h)], alpha=0.6, histtype="step")
-	## KDE pdf line for Z02
-	sp_min = np.nanmin(wind_sp)
-	sp_max = np.nanmax(wind_sp)
-	wind_sp_kde = gaussian_kde(wind_sp)
-	x = np.linspace(sp_min, sp_max, 1000)
-	ax.plot(x, wind_sp_kde(x), color=colors[dh_z02.index(h)])
-ax_z02.set_title("S40.LIDAR.Z02.C0 Wind Direction Distribution April 12, 2026")
-ax_z02.set_ylabel("Density")
-ax_z02.set_xlabel("Wind Direction (deg)")
-ax_z02.legend()
-ax_z02.grid(True, which='both', linestyle='--', linewidth=0.5)
-plt.tight_layout()
-plt.show()
+# # Z02 wind direction histogram and KDE
+# ax = ax_z02
+# for h in dh_z02:
+# 	wind_sp = np.asarray(ds_z02_interp[f"wind_direction"].sel(distance=h)).ravel()
+# 	wind_sp = wind_sp[~np.isnan(wind_sp)]
+# 	ax.hist(wind_sp, bins=30, density=True, label=f"Z02 {h} m (n = {wind_sp.size})", color=colors[dh_z02.index(h)], alpha=0.6, histtype="step")
+# 	## KDE pdf line for Z02
+# 	sp_min = np.nanmin(wind_sp)
+# 	sp_max = np.nanmax(wind_sp)
+# 	wind_sp_kde = gaussian_kde(wind_sp)
+# 	x = np.linspace(sp_min, sp_max, 1000)
+# 	ax.plot(x, wind_sp_kde(x), color=colors[dh_z02.index(h)])
+# ax_z02.set_title("S40.LIDAR.Z02.C0 Wind Direction Distribution April 12, 2026")
+# ax_z02.set_ylabel("Density")
+# ax_z02.set_xlabel("Wind Direction (deg)")
+# ax_z02.legend()
+# ax_z02.grid(True, which='both', linestyle='--', linewidth=0.5)
+# plt.tight_layout()
+# plt.show()
 
 #########################################################
+#from the wind speed time series and ditribution make a list of high wind speed events ( over two times the standard deviation)
+## and record the speed and the time in MST of the high wind speed events
+#from the datasets of M2, Z01, and Z02 combined 
+#as an index vertical list for high wind speed events across M2, Z01, and Z02
+
+def find_high_wind_speed_events(df_m2, ds_z01_interp, ds_z02_interp, dh_m2, dh_z01, dh_z02):
+	high_wind_events = []
+	# M2 high wind speed events
+	for h in dh_m2:
+		wind_sp = np.asarray(df_m2[f"Avg Wind Speed @ {h}m [m/s]"]).ravel()
+		valid_indices = np.flatnonzero(np.isfinite(wind_sp))
+		valid_wind_sp = wind_sp[valid_indices]
+		threshold = 2 * np.std(valid_wind_sp)
+		high_indices = valid_indices[valid_wind_sp > threshold]
+		for idx in high_indices:
+			high_wind_events.append(("M2", h, wind_sp[idx], df_m2.index[idx]))
+	# Z01 high wind speed events
+	for h in dh_z01:
+		wind_sp = np.asarray(ds_z01_interp[f"WS"].sel(height=h)).ravel()
+		valid_indices = np.flatnonzero(np.isfinite(wind_sp))
+		valid_wind_sp = wind_sp[valid_indices]
+		threshold = 2 * np.std(valid_wind_sp)
+		high_indices = valid_indices[valid_wind_sp > threshold]
+		for idx in high_indices:
+			high_wind_events.append(("Z01", h, wind_sp[idx], ds_z01_interp.time[idx].values))
+	# Z02 high wind speed events
+	for h in dh_z02:
+		wind_sp = np.asarray(ds_z02_interp[f"wind_speed"].sel(distance=h)).ravel()
+		valid_indices = np.flatnonzero(np.isfinite(wind_sp))
+		valid_wind_sp = wind_sp[valid_indices]
+		threshold = 2 * np.std(valid_wind_sp)
+		high_indices = valid_indices[valid_wind_sp > threshold]
+		for idx in high_indices:
+			high_wind_events.append(("Z02", h, wind_sp[idx], ds_z02_interp.time[idx].values))
+	return sorted(high_wind_events, key=lambda event: event[2], reverse=True)[:10]
+
+top_wind_events = find_high_wind_speed_events(
+	df_m2, ds_z01_interp, ds_z02_interp, dh_m2, dh_z01, dh_z02
+)
+print("Top 10 high wind speed events:")
+for source, height, wind_speed, event_time in top_wind_events:
+	print(f"{source} at {height} m: {wind_speed:.2f} m/s at {event_time} MST")
+
+####################################################################################################
+#Now that we have the top wind speed event happening at 21:13 MST for April 12, 2026
+## We can now re analyze to correlating temperature profile from the assist.tropoe dataset at the time of the top wind speed event
+## and at hegiths 0 - 200 m 
+time_idx = np.abs(time_mst - np.datetime64("2026-04-12T21:21")).argmin()
+# height_to_analyze = [0, 200, 10] #0 to 200 m with 10 m intervals
+temp_profile = temp_good.values[time_idx, :]
+
+fig, ax = plt.subplots(figsize=(8, 11.5))
+ax.plot(temp_profile, height_m[:temp_profile.size], marker='o', linestyle='-')
+ax.set_xlabel("Temperature (°C)")
+ax.set_ylabel("Height (m)")
+ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 21:21 MST, April 12, 2026")
+ax.grid(True, linestyle='--', alpha=0.4)
+fig.tight_layout()
+plt.show()
+##########################################################################################
+## Now make a field map of the high wind speed time from the DDOPPLER
+
