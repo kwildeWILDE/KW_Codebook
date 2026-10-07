@@ -149,20 +149,70 @@ day = (time >= "2026-04-12 00:00") & (time < "2026-04-13 00:00")
 M2_h_no_80 = np.array([2, 50]) #heights for the M2 temperature time series plot without 80m
 M2_c_no_80 = ['b' , 'g'] #colors assigned to the respective heights for the M2 temperature time series plot without 80m
 
-fig, ax = plt.subplots(figsize=(14, 7))
-for h, c in zip(M2_h_no_80, M2_c_no_80):
-    ax.plot(time[day], M2_series[h][day], color=c, lw=1.5, label=f"M2 {h} m")
+# fig, ax = plt.subplots(figsize=(14, 7))
+# for h, c in zip(M2_h_no_80, M2_c_no_80):
+#     ax.plot(time[day], M2_series[h][day], color=c, lw=1.5, label=f"M2 {h} m")
 
-for h, c in zip(at_h, at_c):
-    idx = np.abs(height_m - h).argmin()
-    ax.plot(time_mst, temp_good.values[:, idx], color=c, lw=1.5, ls='--', label=f"s40.assist.tropoe {h} m")
+# for h, c in zip(at_h, at_c):
+#     idx = np.abs(height_m - h).argmin()
+#     ax.plot(time_mst, temp_good.values[:, idx], color=c, lw=1.5, ls='--', label=f"s40.assist.tropoe {h} m")
 
-ax.set_xlim(np.datetime64("2026-04-12T00:00"), np.datetime64("2026-04-13T00:00"))
-ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
-ax.set_xlabel("Time (MST)")
-ax.set_ylabel("Temperature (°C)")
-ax.set_title("Temperature Time Series for April 12, 2026 (MST) without 80m M2 data")
+# ax.set_xlim(np.datetime64("2026-04-12T00:00"), np.datetime64("2026-04-13T00:00"))
+# ax.xaxis.set_major_formatter(mdates.DateFormatter("%H:%M"))
+# ax.set_xlabel("Time (MST)")
+# ax.set_ylabel("Temperature (°C)")
+# ax.set_title("Temperature Time Series for April 12, 2026 (MST) without 80m M2 data")
+# ax.grid(True, linestyle='--', alpha=0.4)
+# ax.legend(ncol=3, fontsize=9)
+# fig.tight_layout()
+# plt.show()
+
+
+###############################################################################
+#make a (valid) temperature frequency hisogram with a KDE line for the M2 2m and 50m data 
+#and the valid s40.assist.tropoe data
+def clean(a):
+    a = np.asarray(a, dtype=float)
+    return a[~np.isnan(a)]
+
+m2_data = [clean(M2_series[h][day]) for h in M2_h_no_80]
+at_data = [clean(temp_good.values[:, np.abs(height_m - h).argmin()]) for h in at_h]
+
+# shared bins/grid so both datasets are directly comparable
+all_t = np.concatenate(m2_data + at_data)
+bins = np.linspace(all_t.min(), all_t.max(), 25)
+x = np.linspace(all_t.min(), all_t.max(), 500)
+
+# fig, axes = plt.subplots(1, 2, figsize=(14, 6), sharex=True, sharey=True)
+# panels = [
+#     (axes[0], "M2", M2_h_no_80, m2_data, M2_c_no_80),
+#     (axes[1], "s40.assist.tropoe (quality-masked)", at_h, at_data, at_c),
+# ]
+# for ax, name, heights, datasets, cols in panels:
+#     for h, d, c in zip(heights, datasets, cols):
+#         ax.hist(d, bins=bins, density=True, color=c, alpha=0.25)
+#         ax.plot(x, gaussian_kde(d)(x), color=c, lw=2, label=f"{h} m (n={d.size})")
+#     ax.set_title(name)
+#     ax.set_xlabel("Temperature (°C)")
+#     ax.grid(True, linestyle='--', alpha=0.4)
+#     ax.legend(title="Height", fontsize=9)
+# axes[0].set_ylabel("Density")
+# fig.suptitle("Temperature Distribution with KDE, April 12, 2026 (MST)")
+# fig.tight_layout()
+# plt.show()
+
+#################################################################################
+
+# Make a temperature profile over height with the assist.tropoe data at 6:30 MST for April 12, 2026
+time_idx = np.abs(time_mst - np.datetime64("2026-04-12T06:30")).argmin()
+temp_profile = temp_good.values[time_idx, :]
+
+fig, ax = plt.subplots(figsize=(8, 11.5))
+ax.plot(temp_profile, height_m, marker='o', linestyle='-')
+ax.set_xlabel("Temperature (°C)")
+ax.set_ylabel("Height (m)")
+ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 6:30 MST, April 12, 2026")
 ax.grid(True, linestyle='--', alpha=0.4)
-ax.legend(ncol=3, fontsize=9)
 fig.tight_layout()
 plt.show()
+####################################################
