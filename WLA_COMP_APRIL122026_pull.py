@@ -555,14 +555,14 @@ time_idx = np.abs(time_mst - np.datetime64("2026-04-12T21:21")).argmin()
 # height_to_analyze = [0, 200, 10] #0 to 200 m with 10 m intervals
 temp_profile = temp_good.values[time_idx, :]
 
-fig, ax = plt.subplots(figsize=(8, 11.5))
-ax.plot(temp_profile, height_m[:temp_profile.size], marker='o', linestyle='-')
-ax.set_xlabel("Temperature (°C)")
-ax.set_ylabel("Height (m)")
-ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 21:21 MST, April 12, 2026")
-ax.grid(True, linestyle='--', alpha=0.4)
-fig.tight_layout()
-plt.show()
+# fig, ax = plt.subplots(figsize=(8, 11.5))
+# ax.plot(temp_profile, height_m[:temp_profile.size], marker='o', linestyle='-')
+# ax.set_xlabel("Temperature (°C)")
+# ax.set_ylabel("Height (m)")
+# ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 21:21 MST, April 12, 2026")
+# ax.grid(True, linestyle='--', alpha=0.4)
+# fig.tight_layout()
+# plt.show()
 ##########################################################################################
 ## Now make a field map of the high wind speed time from the DDOPPLER
 
@@ -590,7 +590,7 @@ ds_dop = xr.concat(
 	dim="time",
 	data_vars="all",
 	coords="minimal",
-	compact="override",
+	compat="override",
 	combine_attrs="override",
 ).sortby("time")
 
@@ -600,4 +600,95 @@ print("Variables:", list(ds_dop.data_vars))
 print("Dimensions:", dict(ds_dop.sizes))
 print("Max Wind Speed:", ds_dop["WS"].max().values)
 print("Min Wind Speed:", ds_dop["WS"].min().values)  # Print wind speed values for verification   
-	
+
+#getting the wind speed values and filtering out NaN values for analysis
+ws_values = ds_dop["WS"].values
+valid_ws_values = ws_values[np.isfinite(ws_values)]
+print("Non-NaN wind speed values:", valid_ws_values)
+print("Max valid wind speed:", np.max(valid_ws_values))
+print("Min valid wind speed:", np.min(valid_ws_values))
+
+#In the mettadata sigma_WS is the standard deviation of the wind speed measurements,
+## which can be used as a quality indicator. We will filter out any values that are NaN or exceed a reasonable threshold for sigma_WS.
+sig_ws_values = ds_dop["sigma_WS"].values
+valid_sig_ws_values = sig_ws_values[np.isfinite(sig_ws_values)]
+print("Non-NaN sigma wind speed values:", valid_sig_ws_values)
+print("Max valid sigma wind speed:", np.max(valid_sig_ws_values))
+print("Min valid sigma wind speed:", np.min(valid_sig_ws_values))
+
+
+# Treat sigma_WS as a quality indicator, not as a correction to WS.
+MAX_SIGMA_WS = 1.0
+MAX_WIND_SPEED = np.mean(valid_ws_values) + 2 * np.std(valid_ws_values)  # Set a reasonable maximum wind speed for plotting
+## ^^ The reason for using mean + 2*std is to capture the majority of the data while excluding extreme outliers (i.e. + 2 values outside the std)
+##typically the 2+ std method captures about 95% of the data in a normal distribution
+#  This threshold helps ensure that the plotted wind speeds are representative 
+# of typical conditions rather than being dominated by rare, extreme events.
+print("Maximum wind speed for plotting:", MAX_WIND_SPEED)
+
+# Print out the heigths in the fc.doppler dataset
+print("Heights in the fc.doppler dataset:", ds_dop["z"].values)
+print("Time range from the fc.doppler dataset:", ds_dop["time"].values.min(), "to", ds_dop["time"].values.max())
+#This time range is in UTC so convert it to MST (UTC-7) for local reference
+print("Time range in MST:", ds_dop["time"].values.min() - np.timedelta64(7, "h"), "to", ds_dop["time"].values.max() - np.timedelta64(7, "h"))
+#Make a vairable that stores the fc.doppler time in MST for local reference
+ds_dop["time_MST"] = ds_dop["time"].values - np.timedelta64(7, "h")
+
+print("Time in MST for local reference:", ds_dop["time_MST"].values)
+
+
+#####################
+#create a colloection of x-y plane wind speed heat maps on April 12, 2026 21:21 MST 
+## With the heights of (z=) 0, 12.5, 25.0, 37.5, 50.0, 62.5, 75.0, 87.5, 100. , 112.5, 125. , 137.5, and 150.0 meters. 
+heights_to_plot = [0, 12.5, 25.0, 37.5, 50.0, 62.5, 75.0, 87.5, 100.0, 112.5, 125.0, 137.5, 150.0]
+
+desired_time_MST = np.datetime64("2026-04-12T21:21")
+time_values = ds_dop["time_MST"].values.astype("datetime64[ns]")
+# Scans start at irregular times (~every 30 min), so exact matching fails; use the nearest scan.
+nearest_idx = int(np.argmin(np.abs(time_values - desired_time_MST)))
+offset_min = abs((time_values[nearest_idx] - desired_time_MST) / np.timedelta64(1, "m"))
+if offset_min > 30:
+    raise ValueError(f"Desired time not found in the dataset (nearest scan is {offset_min:.1f} min away).")
+print("Using scan starting at (MST):", time_values[nearest_idx], f"({offset_min:.1f} min from desired)")
+desired_time_index = ds_dop.isel(time=nearest_idx)
+
+quality_mask = (
+	desired_time_index["WS"].notnull()
+	& desired_time_index["sigma_WS"].notnull() 
+	& (desired_time_index["sigma_WS"] <= MAX_SIGMA_WS)
+	& (desired_time_index["WS"] >= 0)
+	& (desired_time_index["WS"] <= MAX_WIND_SPEED)
+)
+
+ws_masked = desired_time_index["WS"].where(quality_mask)
+print("Valid wind speed points at this time:", int(ws_masked.notnull().sum()))
+
+# The above code calculates and prints the valid wind speed values from the doppler dataset at the desired time and height.
+#create a collection of x-y plane wind speed heat maps for the specified heights at the desired time
+ncols = 4
+nrows = int(np.ceil(len(heights_to_plot) / ncols))
+fig, axes = plt.subplots(nrows, ncols, figsize=(4.5 * ncols, 3.6 * nrows), sharex=True, sharey=True, squeeze=False)
+vmax = float(ws_masked.max()) if ws_masked.notnull().any() else 1.0
+x_vals = desired_time_index["x"].values
+y_vals = desired_time_index["y"].values
+step = 4  # plot a wind vane every 4th grid point (100 m) to avoid clutter
+mesh = None
+for ax, height in zip(axes.ravel(), heights_to_plot):
+    height_index = int(np.argmin(np.abs(ds_dop["z"].values - height)))
+    ws_h = ws_masked.isel(z=height_index).transpose("y", "x")
+    u_h = desired_time_index["U"].isel(z=height_index).where(quality_mask.isel(z=height_index)).transpose("y", "x")
+    v_h = desired_time_index["V"].isel(z=height_index).where(quality_mask.isel(z=height_index)).transpose("y", "x")
+    mesh = ax.pcolormesh(x_vals, y_vals, ws_h.values, cmap="viridis", vmin=0, vmax=vmax, shading="auto")
+    ax.quiver(x_vals[::step], y_vals[::step], u_h.values[::step, ::step], v_h.values[::step, ::step],
+              color="white", edgecolor="black", linewidth=0.3, pivot="mid", scale=None)
+    ax.set_title(f"z = {ds_dop['z'].values[height_index]:g} m")
+    ax.set_aspect("equal")
+for ax in axes.ravel()[len(heights_to_plot):]:
+    ax.set_visible(False)
+for ax in axes[-1]:
+    ax.set_xlabel("x (m)")
+for ax in axes[:, 0]:
+    ax.set_ylabel("y (m)")
+fig.colorbar(mesh, ax=axes.ravel().tolist(), label="Wind speed (m/s)", shrink=0.8)
+fig.suptitle(f"fc.ddoppler wind speed (shading) and direction (arrows), scan at {np.datetime_as_string(time_values[nearest_idx], unit='m')} MST")
+plt.show()
