@@ -566,3 +566,38 @@ plt.show()
 ##########################################################################################
 ## Now make a field map of the high wind speed time from the DDOPPLER
 
+##################### PULLING DATA FROM THE FC.DDOPPLER DATASET ##########################
+
+dp_dop = "C:/Users/kwilde/Documents/GitHub/KW_Codebook/WDH_Data/corsair/fc.ddoppler.z01.c1/order_ef1285cd9be74679b1fdb5a5d"
+
+# Create one xarray dataset from all NetCDF files in the order.
+nc_files_dop = sorted(glob.glob(f"{dp_dop}/*.nc"))
+if not nc_files_dop:
+	raise FileNotFoundError(f"No NetCDF files found in {dp_dop}")
+
+# These files store timestamps in global attributes reather than coordiants. 
+ds_dop = []
+for nc_file in nc_files_dop:
+	file_ds = xr.open_dataset(nc_file)
+	start_time = np.datetime64(file_ds.attrs["start_time"])
+	if start_time is None:
+		file_ds.close()
+		raise ValueError(f"Start time not found in {nc_file}")
+	ds_dop.append(file_ds.expand_dims(time=[start_time]))
+
+ds_dop = xr.concat(
+	ds_dop, 
+	dim="time",
+	data_vars="all",
+	coords="minimal",
+	compact="override",
+	combine_attrs="override",
+).sortby("time")
+
+# See the variables and dimensions in the combined dataset.
+print("Files loaded:", len(nc_files_dop))
+print("Variables:", list(ds_dop.data_vars))
+print("Dimensions:", dict(ds_dop.sizes))
+print("Max Wind Speed:", ds_dop["WS"].max().values)
+print("Min Wind Speed:", ds_dop["WS"].min().values)  # Print wind speed values for verification   
+	
