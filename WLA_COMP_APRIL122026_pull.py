@@ -551,18 +551,19 @@ for source, height, wind_speed, event_time in top_wind_events:
 #Now that we have the top wind speed event happening at 21:13 MST for April 12, 2026
 ## We can now re analyze to correlating temperature profile from the assist.tropoe dataset at the time of the top wind speed event
 ## and at hegiths 0 - 200 m 
+height_to_analyze = np.arange(0, 201, 10)  # 0 to 200 m with 10 m intervals
 time_idx = np.abs(time_mst - np.datetime64("2026-04-12T21:21")).argmin()
 # height_to_analyze = [0, 200, 10] #0 to 200 m with 10 m intervals
-temp_profile = temp_good.values[time_idx, :]
+temp_profile = temp_good.values[time_idx, :height_to_analyze.size]
 
-# fig, ax = plt.subplots(figsize=(8, 11.5))
-# ax.plot(temp_profile, height_m[:temp_profile.size], marker='o', linestyle='-')
-# ax.set_xlabel("Temperature (°C)")
-# ax.set_ylabel("Height (m)")
-# ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 21:21 MST, April 12, 2026")
-# ax.grid(True, linestyle='--', alpha=0.4)
-# fig.tight_layout()
-# plt.show()
+fig, ax = plt.subplots(figsize=(8, 11.5))
+ax.plot(temp_profile, height_to_analyze[:temp_profile.size], marker='o', linestyle='-')
+ax.set_xlabel("Temperature (°C)")
+ax.set_ylabel("Height (m)")
+ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 21:21 MST, April 12, 2026")
+ax.grid(True, linestyle='--', alpha=0.4)
+fig.tight_layout()
+plt.show()
 ##########################################################################################
 ## Now make a field map of the high wind speed time from the DDOPPLER
 
@@ -667,28 +668,28 @@ print("Valid wind speed points at this time:", int(ws_masked.notnull().sum()))
 #create a collection of x-y plane wind speed heat maps for the specified heights at the desired time
 ncols = 4
 nrows = int(np.ceil(len(heights_to_plot) / ncols))
-fig, axes = plt.subplots(nrows, ncols, figsize=(4.5 * ncols, 3.6 * nrows), sharex=True, sharey=True, squeeze=False)
-vmax = float(ws_masked.max()) if ws_masked.notnull().any() else 1.0
-x_vals = desired_time_index["x"].values
-y_vals = desired_time_index["y"].values
-step = 4  # plot a wind vane every 4th grid point (100 m) to avoid clutter
-mesh = None
-for ax, height in zip(axes.ravel(), heights_to_plot):
-    height_index = int(np.argmin(np.abs(ds_dop["z"].values - height)))
-    ws_h = ws_masked.isel(z=height_index).transpose("y", "x")
-    u_h = desired_time_index["U"].isel(z=height_index).where(quality_mask.isel(z=height_index)).transpose("y", "x")
-    v_h = desired_time_index["V"].isel(z=height_index).where(quality_mask.isel(z=height_index)).transpose("y", "x")
-    mesh = ax.pcolormesh(x_vals, y_vals, ws_h.values, cmap="viridis", vmin=0, vmax=vmax, shading="auto")
-    ax.quiver(x_vals[::step], y_vals[::step], u_h.values[::step, ::step], v_h.values[::step, ::step],
-              color="white", edgecolor="black", linewidth=0.3, pivot="mid", scale=None)
-    ax.set_title(f"z = {ds_dop['z'].values[height_index]:g} m")
-    ax.set_aspect("equal")
-for ax in axes.ravel()[len(heights_to_plot):]:
-    ax.set_visible(False)
-for ax in axes[-1]:
-    ax.set_xlabel("x (m)")
-for ax in axes[:, 0]:
-    ax.set_ylabel("y (m)")
-fig.colorbar(mesh, ax=axes.ravel().tolist(), label="Wind speed (m/s)", shrink=0.8)
-fig.suptitle(f"fc.ddoppler wind speed (shading) and direction (arrows), scan at {np.datetime_as_string(time_values[nearest_idx], unit='m')} MST")
-plt.show()
+# fig, axes = plt.subplots(nrows, ncols, figsize=(4.5 * ncols, 3.6 * nrows), sharex=True, sharey=True, squeeze=False)
+# vmax = float(ws_masked.max()) if ws_masked.notnull().any() else 1.0
+# x_vals = desired_time_index["x"].values
+# y_vals = desired_time_index["y"].values
+# step = 4  # plot a wind vane every 4th grid point (100 m) to avoid clutter
+# mesh = None
+# for ax, height in zip(axes.ravel(), heights_to_plot):
+#     height_index = int(np.argmin(np.abs(ds_dop["z"].values - height)))
+#     ws_h = ws_masked.isel(z=height_index).transpose("y", "x")
+#     u_h = desired_time_index["U"].isel(z=height_index).where(quality_mask.isel(z=height_index)).transpose("y", "x")
+#     v_h = desired_time_index["V"].isel(z=height_index).where(quality_mask.isel(z=height_index)).transpose("y", "x")
+#     mesh = ax.pcolormesh(x_vals, y_vals, ws_h.values, cmap="viridis", vmin=0, vmax=vmax, shading="auto")
+#     ax.quiver(x_vals[::step], y_vals[::step], u_h.values[::step, ::step], v_h.values[::step, ::step],
+#               color="white", edgecolor="black", linewidth=0.3, pivot="mid", scale=None)
+#     ax.set_title(f"z = {ds_dop['z'].values[height_index]:g} m")
+#     ax.set_aspect("equal")
+# for ax in axes.ravel()[len(heights_to_plot):]:
+#     ax.set_visible(False)
+# for ax in axes[-1]:
+#     ax.set_xlabel("x (m)")
+# for ax in axes[:, 0]:
+#     ax.set_ylabel("y (m)")
+# fig.colorbar(mesh, ax=axes.ravel().tolist(), label="Wind speed (m/s)", shrink=0.8)
+# fig.suptitle(f"fc.ddoppler wind speed (shading) and direction (arrows), scan at {np.datetime_as_string(time_values[nearest_idx], unit='m')} MST")
+# plt.show()
