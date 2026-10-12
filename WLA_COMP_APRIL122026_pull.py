@@ -49,6 +49,62 @@ ri_5080 = df_m2['Richardson Number (50-80m)']
 # plt.tight_layout()
 # plt.show()
 
+#########################################
+#Plotting the Bivriate Kernel Desnity Estimation (KDE) joint probability Joint Density Function (PDF) 
+## between the M2 temperature and wind speeds at heights 2 and 50m 
+### and when the 2-50 Ri number is below 0.25 
+#make the variables of the wind speed and temperature for the heights 2 and 50
+
+temp_2_m2 = df_m2["Temperature @ 2m [deg C]"]
+temp_50_m2 = df_m2["Temperature @ 50m [deg C]"]
+
+windsp_2_m2 = df_m2["Avg Wind Speed @ 2m [m/s]"]
+windsp_50_m2 = df_m2["Avg Wind Speed @ 50m [m/s]"]
+
+#make a time vraible that corresponds to when the richadson number at 2-50 m is less than 0.25
+time_intRi_2_50_less = time[np.asarray(ri_250) < 0.25]
+intRi_2_50_less =ri_250[np.asarray(ri_250) < 0.25]
+
+#Bivariate (2D) Kernel Desnity Estimation (KDE) joint PDF of wind speed and temperature at the heigths 2-50
+#overlaid on the raw scatter 
+
+m2_height = {
+	'2m': (windsp_2_m2 , temp_2_m2, 'b'),
+    '50m': (windsp_50_m2, temp_50_m2, 'g'),         
+			 }
+
+#mask of the samples where the 2-50m Ri number is less (same samples as time_intRi_50_less)
+
+less_mask = np.asarray(intRi_2_50_less).ravel() < 0.25
+print(less_mask.shape)
+
+fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=False, sharey=False)
+
+for ax, (label, (windsp, temp, color)) in zip(axes, m2_height.items()):
+	wind_sp = np.asarray(windsp).ravel()
+	temp = np.asarray(temp).ravel()
+	valid = ~(np.isnan(wind_sp) | np.isnan(temp)) @ less_mask #keep non-NaN samples taken when Ri(2-50m) < 0.25
+	wind_sp, temp = wind_sp[valid], temp[valid]
+
+    # 2D KDE: non-parametric joint PDF, so multiple modes are preserved instead of forced into one Gaussian
+	kde = gaussian_kde(np.vstack([wind_sp, temp]))
+	
+	x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
+	y = np.linspace(temp.min(), temp.max(), 100)
+	X, Y = np.meshgrid(x, y)
+	Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape) #evaluate the KDE joint PDF at each grid point
+
+	ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
+	ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
+	ax.set_xlabel(f'Wind Speed @ {label}')
+	ax.set_ylabel(f'Temperature @ {label}')
+	ax.set_title(f'KDE Joint PDF @ {label} (n={wind_sp.size})', fontsize=10)
+	ax.grid(True, linestyle='--', alpha=0.5)
+
+fig.suptitle('Bivariate KDE Joint PDF of Wind Speed and Temperature (Ri 2-50 m < 0) April 12, 2026')
+plt.tight_layout()
+plt.show()
+
 ########################################################
 
 ## PULLING DATA FROM THE S40.ASSIST.TROPOE.Z01.C0 FILE ############
@@ -556,14 +612,14 @@ time_idx = np.abs(time_mst - np.datetime64("2026-04-12T21:21")).argmin()
 # height_to_analyze = [0, 200, 10] #0 to 200 m with 10 m intervals
 temp_profile = temp_good.values[time_idx, :height_to_analyze.size]
 
-fig, ax = plt.subplots(figsize=(8, 11.5))
-ax.plot(temp_profile, height_to_analyze[:temp_profile.size], marker='o', linestyle='-')
-ax.set_xlabel("Temperature (°C)")
-ax.set_ylabel("Height (m)")
-ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 21:21 MST, April 12, 2026")
-ax.grid(True, linestyle='--', alpha=0.4)
-fig.tight_layout()
-plt.show()
+# fig, ax = plt.subplots(figsize=(8, 11.5))
+# ax.plot(temp_profile, height_to_analyze[:temp_profile.size], marker='o', linestyle='-')
+# ax.set_xlabel("Temperature (°C)")
+# ax.set_ylabel("Height (m)")
+# ax.set_title("s40.assist.tropoe.z01.c0 Temperature Profile at 21:21 MST, April 12, 2026")
+# ax.grid(True, linestyle='--', alpha=0.4)
+# fig.tight_layout()
+# plt.show()
 ##########################################################################################
 ## Now make a field map of the high wind speed time from the DDOPPLER
 
