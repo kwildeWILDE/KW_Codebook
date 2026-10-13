@@ -1,10 +1,11 @@
 #import the libararies
+from matplotlib.patches import Patch
 import numpy as np
 import pandas as pd
 import xarray as xr
 import matplotlib.pyplot as plt
 import matplotlib.dates as mdates
-from scipy.stats import gaussian_kde
+from scipy.stats import gaussian_kde, norm
 import glob
 
 ############# PULL THE M2 DATA #############
@@ -75,35 +76,105 @@ m2_height = {
 
 #mask of the samples where the 2-50m Ri number is less (same samples as time_intRi_50_less)
 
-less_mask = np.asarray(intRi_2_50_less).ravel() < 0.25
+less_mask = np.asarray(ri_250).ravel() < 0.25
 print(less_mask.shape)
 
-fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=False, sharey=False)
+# fig, axes = plt.subplots(1, 2, figsize=(12, 6), sharex=False, sharey=False)
 
-for ax, (label, (windsp, temp, color)) in zip(axes, m2_height.items()):
-	wind_sp = np.asarray(windsp).ravel()
-	temp = np.asarray(temp).ravel()
-	valid = ~(np.isnan(wind_sp) | np.isnan(temp)) @ less_mask #keep non-NaN samples taken when Ri(2-50m) < 0.25
-	wind_sp, temp = wind_sp[valid], temp[valid]
+# for ax, (label, (windsp, temp, color)) in zip(axes, m2_height.items()):
+# 	wind_sp = np.asarray(windsp).ravel()
+# 	temp = np.asarray(temp).ravel()
+# 	valid = (~(np.isnan(wind_sp) | np.isnan(temp))) & less_mask #keep non-NaN samples taken when Ri(2-50m) < 0.25
+# 	wind_sp, temp = wind_sp[valid], temp[valid]
 
-    # 2D KDE: non-parametric joint PDF, so multiple modes are preserved instead of forced into one Gaussian
-	kde = gaussian_kde(np.vstack([wind_sp, temp]))
+#     # 2D KDE: non-parametric joint PDF, so multiple modes are preserved instead of forced into one Gaussian
+# 	kde = gaussian_kde(np.vstack([wind_sp, temp]))
 	
-	x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
-	y = np.linspace(temp.min(), temp.max(), 100)
-	X, Y = np.meshgrid(x, y)
-	Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape) #evaluate the KDE joint PDF at each grid point
+# 	x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
+# 	y = np.linspace(temp.min(), temp.max(), 100)
+# 	X, Y = np.meshgrid(x, y)
+# 	Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape) #evaluate the KDE joint PDF at each grid point
 
-	ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
-	ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
-	ax.set_xlabel(f'Wind Speed @ {label}')
-	ax.set_ylabel(f'Temperature @ {label}')
-	ax.set_title(f'KDE Joint PDF @ {label} (n={wind_sp.size})', fontsize=10)
-	ax.grid(True, linestyle='--', alpha=0.5)
+# 	ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
+# 	ax.scatter(wind_sp, temp, s=10, c=color, edgecolor='k', linewidth=0.3)
+# 	ax.set_xlabel(f'Wind Speed @ {label}')
+# 	ax.set_ylabel(f'Temperature @ {label}')
+# 	ax.set_title(f'KDE Joint PDF @ {label} (n={wind_sp.size})', fontsize=10)
+# 	ax.grid(True, linestyle='--', alpha=0.5)
 
-fig.suptitle('Bivariate KDE Joint PDF of Wind Speed and Temperature (Ri 2-50 m < 0) April 12, 2026')
+# fig.suptitle('Bivariate KDE Joint PDF of Wind Speed and Temperature (Ri 2-50 m < 0) April 12, 2026')
+# plt.tight_layout()
+# plt.show()
+#####################################
+#plot the highlighted outlier samples along the time series fro the 2-50 Ri Number and 
+## the corresponding wind speed and temperature measurements at the respective heights
+
+time_series = {
+	'2m': (windsp_2_m2 , temp_2_m2, 'b'),
+    '50m': (windsp_50_m2, temp_50_m2, 'g'),
+}
+
+x = time
+y1 = (min(windsp_2_m2.min(), windsp_50_m2.min()), max(windsp_2_m2.max(), windsp_50_m2.max()))
+y2 = (min(temp_2_m2.min(), temp_50_m2.min()), max(temp_2_m2.max(), temp_50_m2.max()))
+#Richardson number (2-50 m) outliers will be highlighted in the time series plots below
+#y3 = (min(ri_250.min()), max(ri_250.max()))
+
+# half the median sample spacing, used to size the shaded outlier spans below
+half_dt = pd.Series(time).diff().dropna().median() / 2
+outlier_patch = Patch(facecolor='yellow', alpha=0.30, label='Outlier (outside outer PDF contour)')
+
+fig, axes = plt.subplots(3, 1, figsize=(12, 10), sharex=True)
+ax_ri = axes[2]
+ax_ri.plot(x, ri_250, color='purple', label='Ri (2-50 m)')
+ax_ri.axhline(0.25, color='r', linewidth=0.5, linestyle='--')
+ax_ri.set_yscale('symlog', linthresh=0.10)
+ax_ri.set_ylabel('Richardson Number')
+ax_ri.set_title('Time Series of Richardson Number (2-50 m)')
+ax_ri.grid(True, linestyle='--', alpha=0.5)
+
+for ax1, (label, (wind_sp, temp, color)) in zip(axes[:2], time_series.items()):
+    ax1.plot(x, wind_sp, label=f'Wind Speed @ {label}', color=color, linestyle='--')
+    ax1.set_ylabel('Wind Speed (m/s)')
+    ax1.set_ylim(y1)
+    ax1.grid(True, linestyle='--', alpha=0.5)
+
+    ax2 = ax1.twinx()
+    ax2.plot(x, temp, label=f'Temperature @ {label}', color=color, linestyle='-')
+    ax2.set_ylabel('Temperature (°C)')
+    ax2.set_ylim(y2)
+    ax1.set_title(f'Time Series of Wind Speed and Temperature @ {label}')
+
+    # refit the same KDE joint PDF used in the bivariate plot (non-NaN samples with Ri(2-50m) < 0.25)
+    wind_arr = np.asarray(wind_sp).ravel()
+    temp_arr = np.asarray(temp).ravel()
+    valid = (~(np.isnan(wind_arr) | np.isnan(temp_arr))) & less_mask
+
+    kde = gaussian_kde(np.vstack([wind_arr[valid], temp_arr[valid]]))
+    pdf_vals = kde(np.vstack([wind_arr[valid], temp_arr[valid]]))
+
+    # bottom 5% of density values ~ points falling outside the outer contour in the joint PDF plot
+    outlier_threshold = np.percentile(pdf_vals, 5)
+    outlier_times = np.asarray(x)[valid][pdf_vals < outlier_threshold]
+
+    for t in outlier_times:
+        for a in (ax1, ax_ri):
+            a.axvspan(t - half_dt, t + half_dt, color='yellow', alpha=0.30, zorder=0)
+
+    # combine legends from both axes (plus the outlier span) into a single legend
+    lines1, labels1 = ax1.get_legend_handles_labels()
+    lines2, labels2 = ax2.get_legend_handles_labels()
+    ax1.legend(lines1 + lines2 + [outlier_patch], labels1 + labels2 + [outlier_patch.get_label()], loc='upper right')
+
+axes[-1].set_xlabel('Time')
+axes[-1].xaxis.set_major_locator(mdates.HourLocator(interval=2))
+axes[-1].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d %H:%M'))
+plt.setp(axes[-1].get_xticklabels(), rotation=45, fontsize=10)
+
+fig.suptitle('Time Series of Wind Speed and Temperature at Different Heights April 12, 2026')
 plt.tight_layout()
 plt.show()
+
 
 ########################################################
 
