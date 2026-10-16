@@ -153,21 +153,30 @@ print(ds_m2.head(10))
 ##########################################
 # From the M2 created a frequency histogram with witbull fit line  of wind speed at the M2 data set at 10 m 
 #for each month (Feb - October )
-for month in range(2, 11):  # February (2) to October (10)
-    ds_m2_month = ds_m2[ds_m2['UTC_time'].dt.month == month]
-    wind_speed_10m = ds_m2_month['Avg Wind Speed @ 10m [m/s]']  
-    
-    plt.figure(figsize=(8, 6))
-    plt.hist(wind_speed_10m, density=True, bins=20, color='skyblue')
-    
-    # Fit Weibull distribution
-    params = weibull_min.fit(wind_speed_10m, floc=0)
-    x = np.linspace(0, wind_speed_10m.max(), 100)
-    plt.plot(x, weibull_min.pdf(x, *params), 'r-', lw=2)
-    
-    plt.title(f'Wind Speed at 10 m - Month {month}')
+height = 10 # in meters
+ws_col = f'Avg Wind Speed @ {height}m [m/s]'
+for month in sorted(months):
+    ds_m2_month = ds_m2_filtered.loc[ds_m2_filtered['UTC_time'].dt.month == month]
+    wind_speeds = ds_m2_month[ws_col].loc[ds_m2_month[ws_col] > 0].dropna()
+    if len(wind_speeds) < 2:
+        continue
+    plt.figure(figsize=(12, 6))
+    plt.hist(wind_speeds, bins=30, alpha=m2_h_alphas[height], color=m2_h_colors[height],
+             label=f'{height}m M2 data', density=True)
+    # Fit a Weibull distribution (location fixed at 0)
+    shape, loc, scale = stats.weibull_min.fit(wind_speeds, floc=0)
+    x = np.linspace(wind_speeds.min(), wind_speeds.max(), 200)
+    plt.plot(x, stats.weibull_min.pdf(x, shape, loc, scale), color='black',
+             label=f'Weibull fit (k={shape:.2f}, c={scale:.2f} m/s)')
     plt.xlabel('Wind Speed (m/s)')
-    plt.ylabel('Density')
+    plt.ylabel('Frequency (probability density)')
+    plt.title(f'M2 {height} m Wind Speed Distribution (Month: {month}, 2026)')
+    plt.legend()
+    plt.tight_layout()
+    plt.grid(True, alpha=0.2, ls='--')
     plt.show()
+
+    ## Save the figures later.
+    
 
 
