@@ -34,16 +34,144 @@ print(ds_z01.head())
 print('##' * 40)
 z01_time = ds_z01['time']
 print(z01_time)
+ds_z01['datetime'] = ('time', pd.to_datetime(ds_z01['time'].astype(str).values))
+print(ds_z01['datetime'])
 ################################################################
 z01_h = ds_z01['height'] 
 
 z01_ws = ds_z01['WS']
 
-#print a list of heights with valide wind speed data
-valid_heights = z01_h.where(z01_ws.notnull(), drop=True)
-print(valid_heights)
+# Print each height and the number of valid wind-speed data points.
+valid_ws_counts = z01_ws.count(dim='time')
+height_ws_counts = pd.DataFrame({
+    'height': z01_h.values,
+    'valid_ws_count': valid_ws_counts.values
+})
+print(height_ws_counts.to_string(index=False))
 
-# z01_h1 = z01_h.isel(height=120, method='nearest') #in meters
-#fix and work through tomorrow
+#wind speed at 120 m (select by height value, not by index)
+z01_ws_120 = ds_z01['WS'].sel(height=120)
 
+#create a month varible 
+ds_z01['month'] = ds_z01['datetime'].dt.month
+#create a month by month wind speed timeline plot at 120 m 
+months = np.unique(ds_z01['month'].values)
+# for month in months:
+#     plt.figure(figsize=(12, 6))
+#     in_month = (ds_z01['month'] == month).values
+#     ws_month = z01_ws_120.isel(time=in_month)
+#     time_month = ds_z01['datetime'].isel(time=in_month)
+#     valid = (ws_month > 0).values
+#     plt.plot(time_month.values[valid], ws_month.values[valid],
+#              label='120m', color='orange', alpha=0.8)
+#     plt.xlabel('UTC Time')
+#     plt.ylabel('Wind Speed (m/s)')
+#     plt.title(f'Z01 Wind Speed at 120 m (Month: {month}, 2026)')
+#     plt.legend()
+#     plt.tight_layout()
+#     plt.grid(True, alpha=0.2, ls='--')
+#     plt.show()
 
+############################################################################
+#make a frequency hitogram with a weibull fit for windspeed at 120 m 
+#on a month by month basis
+
+# for month in months:
+#     plt.figure(figsize=(12, 6))
+#     in_month = (ds_z01['month'] == month).values
+#     ws_month = z01_ws_120.isel(time=in_month)
+#     valid = (ws_month > 0).values
+#     ws_valid = ws_month.values[valid]
+#     plt.hist(ws_valid, bins=20, density=True, alpha=0.6, color='orange', label='120m')
+#     if len(ws_valid) > 0:
+#         shape, loc, scale = weibull_min.fit(ws_valid, floc=0)
+#         x = np.linspace(0, ws_valid.max(), 100)
+#         plt.plot(x, weibull_min.pdf(x, shape, loc, scale), 'r-', lw=2, label='Weibull fit')
+#     plt.xlabel('Wind Speed (m/s)')
+#     plt.ylabel('Frequency')
+#     plt.title(f'Z01 Wind Speed Frequency at 120 m (Month: {month}, 2026)')
+#     plt.legend()
+#     plt.tight_layout()
+#     plt.grid(True, alpha=0.2, ls='--')
+#     plt.show()
+
+####################################################################
+#Make a wind rose plot for wind speed at 120 m on a month by month basis
+
+# for month in months:
+#     plt.figure(figsize=(10, 8))
+#     in_month = (ds_z01['month'] == month).values
+#     ws_month = z01_ws_120.isel(time=in_month)
+#     wd_month = ds_z01['WD'].sel(height=120).isel(time=in_month)
+#     valid = ((ws_month > 0) & wd_month.notnull()).values
+#     ws_valid = ws_month.values[valid]
+#     wd_valid = wd_month.values[valid]
+#     if len(ws_valid) > 0:
+#         ax = WindroseAxes.from_ax()
+#         speed_bins = np.arange(0, ws_valid.max() + 1, 1)
+#         cmap = plt.get_cmap('viridis')
+#         ax.bar(wd_valid, ws_valid, normed=True, opening=0.8, edgecolor='white', cmap=cmap, bins=speed_bins)
+#         ax.set_legend(loc='lower right')
+#         plt.title(f'Z01 Wind Rose at 120 m (Month: {month}, 2026)')
+#         plt.tight_layout()
+#         plt.show()
+##########################################################################################
+#Do the same timeline, histogram, and wind rose analysis for wind speed at 200 m
+#wind speed at 120 m (select by height value, not by index)
+z01_ws_200 = ds_z01['WS'].sel(height=200)
+
+#timeline plot for wind speed at 200 m on a month by month basis
+# for month in months:
+#     plt.figure(figsize=(12, 6))
+#     in_month = (ds_z01['month'] == month).values
+#     ws_month = z01_ws_200.isel(time=in_month)
+#     time_month = ds_z01['datetime'].isel(time=in_month)
+#     valid = (ws_month > 0).values
+#     plt.plot(time_month.values[valid], ws_month.values[valid],
+#              label='200m', color='purple', alpha=0.8)
+#     plt.xlabel('UTC Time')
+#     plt.ylabel('Wind Speed (m/s)')
+#     plt.title(f'Z01 Wind Speed at 200 m (Month: {month}, 2026)')
+#     plt.legend()
+#     plt.tight_layout()
+#     plt.grid(True, alpha=0.2, ls='--')
+#     plt.show()
+
+# #histogram plot for wind speed at 200 m on a month by month basis
+# for month in months:
+#     plt.figure(figsize=(10, 6))
+#     in_month = (ds_z01['month'] == month).values
+#     ws_month = z01_ws_200.isel(time=in_month)
+#     valid = (ws_month > 0).values
+#     ws_valid = ws_month.values[valid]
+#     plt.hist(ws_valid, bins=20, density=True, alpha=0.6, color='purple', label='200m')
+#     if len(ws_valid) > 0:
+#         shape, loc, scale = weibull_min.fit(ws_valid, floc=0)
+#         x = np.linspace(0, ws_valid.max(), 100)
+#         plt.plot(x, weibull_min.pdf(x, shape, loc, scale), 'r-', lw=2, label='Weibull fit')
+#     plt.xlabel('Wind Speed (m/s)')
+#     plt.ylabel('Frequency')
+#     plt.title(f'Z01 Wind Speed Frequency at 200 m (Month: {month}, 2026)')
+#     plt.legend()
+#     plt.tight_layout()
+#     plt.grid(True, alpha=0.2, ls='--')
+#     plt.show()
+
+# #wind rose plot for wind speed at 200 m on a month by month basis
+for month in months:
+    plt.figure(figsize=(10, 8))
+    in_month = (ds_z01['month'] == month).values
+    ws_month = z01_ws_200.isel(time=in_month)
+    wd_month = ds_z01['WD'].sel(height=200).isel(time=in_month)
+    valid = ((ws_month > 0) & wd_month.notnull()).values
+    ws_valid = ws_month.values[valid]
+    wd_valid = wd_month.values[valid]
+    if len(ws_valid) > 0:
+        ax = WindroseAxes.from_ax()
+        speed_bins = np.arange(0, ws_valid.max() + 1, 1)
+        cmap = plt.get_cmap('viridis')
+        ax.bar(wd_valid, ws_valid, normed=True, opening=0.8, edgecolor='white', cmap=cmap, bins=speed_bins)
+        ax.set_legend(loc='lower right')
+        plt.title(f'Z01 Wind Rose at 200 m (Month: {month}, 2026)')
+        plt.tight_layout()
+        plt.show()
