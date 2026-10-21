@@ -98,8 +98,8 @@ at_temp_0_200m = ds_at_filtered['temperature'].sel(height=slice(0, 0.2))
 #have their corresponding color based on the height they represent 
 #define the colors for each height
 height_colors = {
-    2: 'blue',
-    50: 'green',
+    2: 'cyan',
+    50: 'magenta',
 }
 
 #make sure that the time varaible between M2 and ASSIST datasets are aligned
@@ -139,8 +139,8 @@ for month in months:
     #overlay the M2 scatter points on a second y-axis (temperature) so their variation is visible
     #make sure that the M2 scatter points only include positive temperature values or valid measurements
     ax2 = ax.twinx()
-    ax2.scatter(m2_temp_2m_month.index[m2_temp_2m_month.values > -20], m2_temp_2m_month.values[m2_temp_2m_month.values > -20], c=height_colors[2], label='M2 2m', s=10)
-    ax2.scatter(m2_temp_50m_month.index[m2_temp_50m_month.values > -20], m2_temp_50m_month.values[m2_temp_50m_month.values > -20], c=height_colors[50], label='M2 50m', s=10)
+    ax2.scatter(m2_temp_2m_month.index[m2_temp_2m_month.values > -20], m2_temp_2m_month.values[m2_temp_2m_month.values > -20], c=height_colors[2], label='M2 2m', s=5,)
+    ax2.scatter(m2_temp_50m_month.index[m2_temp_50m_month.values > -20], m2_temp_50m_month.values[m2_temp_50m_month.values > -20], c=height_colors[50], label='M2 50m', s=5)
     #ax2.scatter(m2_temp_80m_month.index, m2_temp_80m_month.values, c=height_colors[80], label='M2 80m', s=10)
 
     ax.set_ylim(0, 200)
@@ -153,3 +153,4 @@ for month in months:
     plt.show()
 
 # Note: The 80m M2 temperature data has been poorly recored there and is therefore not included in the plots.#### 
+#fix later 
