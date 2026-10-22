@@ -99,7 +99,7 @@ at_temp_0_200m = ds_at_filtered['temperature'].sel(height=slice(0, 0.2))
 #define the colors for each height
 height_colors = {
     2: 'cyan',
-    50: 'magenta',
+    50: 'tomato',
 }
 
 #make sure that the time varaible between M2 and ASSIST datasets are aligned
@@ -139,12 +139,15 @@ for month in months:
     #overlay the M2 scatter points on a second y-axis (temperature) so their variation is visible
     #make sure that the M2 scatter points only include positive temperature values or valid measurements
     ax2 = ax.twinx()
-    ax2.scatter(m2_temp_2m_month.index[m2_temp_2m_month.values > -20], m2_temp_2m_month.values[m2_temp_2m_month.values > -20], c=height_colors[2], label='M2 2m', s=5,)
-    ax2.scatter(m2_temp_50m_month.index[m2_temp_50m_month.values > -20], m2_temp_50m_month.values[m2_temp_50m_month.values > -20], c=height_colors[50], label='M2 50m', s=5)
+    #ASSIST temperature averaged over a fixed 10-50 m layer (heights in km) for a like-for-like comparison with the M2
+    at_fixed = at_temp_0_200m_month.sel(height=slice(0.010, 0.050)).mean('height', skipna=True)
+    ax2.plot(at_fixed['time'], at_fixed.values, color='white', lw=0.8, alpha=0.8, label='ASSIST 10-50 m mean')
+    ax2.scatter(m2_temp_2m_month.index[m2_temp_2m_month.values > -20], m2_temp_2m_month.values[m2_temp_2m_month.values > -20], c=height_colors[2], label='M2 2m Temp', s=3,)
+    ax2.scatter(m2_temp_50m_month.index[m2_temp_50m_month.values > -20], m2_temp_50m_month.values[m2_temp_50m_month.values > -20], c=height_colors[50], label='M2 50m Temp', s=3)
     #ax2.scatter(m2_temp_80m_month.index, m2_temp_80m_month.values, c=height_colors[80], label='M2 80m', s=10)
 
     ax.set_ylim(0, 200)
-    ax.set_xlabel('Time')
+    ax.set_xlabel('Time (UTC)')
     ax.set_ylabel('Height [m] (ASSIST)')
     ax2.set_ylabel('M2 Temperature [deg C]')
     plt.title(f'Temperature over Height (ASSIST) with M2 Scatter Points for month {month}, 2026')
@@ -153,4 +156,4 @@ for month in months:
     plt.show()
 
 # Note: The 80m M2 temperature data has been poorly recored there and is therefore not included in the plots.#### 
-#fix later 
+
