@@ -333,4 +333,4 @@ both_outliers_df = pd.DataFrame({
 })
 print("Both outliers:")
 print(both_outliers_df)
-# both_outliers_df.to_csv('both_outliers.csv', index=False) 
+both_outliers_df.to_csv('both_outliers.csv', index=False)
