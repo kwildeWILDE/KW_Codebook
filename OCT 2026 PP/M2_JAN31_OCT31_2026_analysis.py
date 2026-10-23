@@ -11,6 +11,7 @@ from scipy.stats import gaussian_kde, norm, weibull_min, multivariate_normal
 import matplotlib.dates as mdates
 import matplotlib.colors as mcolors
 from matplotlib.patches import Ellipse, Patch
+from windrose import WindroseAxes
 
 #############################################
 #Pull the Full M2 data from Jan 31 to Oct 17, 2026 
@@ -72,6 +73,10 @@ def mask_flat_runs(series, min_run=MIN_FLAT_RUN):
     return series.mask((run_len >= min_run) & series.notna())
 
 wind_speed10_clean = mask_flat_runs(wind_speed10)
+wind_speed50_clean = mask_flat_runs(wind_speed50)
+wind_speed80_clean = mask_flat_runs(wind_speed80)
+wind_dir50_clean = mask_flat_runs(wind_dir50)  # stuck direction readings (e.g. repeated 0 deg)
+wind_dir80_clean = mask_flat_runs(wind_dir80)
 for month in range(2, 11):
     n_flat = (wind_speed10[time.dt.month == month].notna() & wind_speed10_clean[time.dt.month == month].isna()).sum()
     print(f"Month {month}: removed {n_flat} flat wind speed samples")
@@ -95,5 +100,36 @@ for month in range(2, 11):
 #     plt.legend()
 #     plt.show()
 
+################################################################
+#Wind rose plots for 50m and 80m 
+#on a month to month basis (Feb-Oct 2026)
+#Note: Keep the scale and probability bins consistent across months for comparison
 
-#
+# Wind rose for 50m month to month
+SPEED_BINS = np.arange(0, 22, 2)  # fixed speed bins (m/s) shared by all months
+RMAX = 20                         # fixed max radial frequency (%) shared by all months; raise if bars clip
+# for month in range(2, 11):
+#     mask = (time.dt.month == month) &     wind_dir50_clean.notna() & wind_speed50.notna()    
+#     plt.figure(figsize=(8, 8))
+#     ax = WindroseAxes.from_ax()
+#     ax.bar(wind_dir50_clean[mask], wind_speed50[mask], normed=True, opening=0.8, edgecolor='white', bins=SPEED_BINS)
+#     ax.set_ylim(0, RMAX)
+#     ax.set_rgrids(np.linspace(0, RMAX, 5)[1:], labels=[f'{r:.0f}%' for r in np.linspace(0, RMAX, 5)[1:]])
+#     ax.set_legend(title='Wind Speed [m/s]')
+#     ax.set_title(f' M2 Wind Rose at 50m - Month {month}')
+#     plt.show()
+################################
+#Wind rose for 80m month to month
+# for month in range(2, 11):
+#     mask = (time.dt.month == month) & wind_dir80_clean.notna() & wind_speed80_clean.notna()
+#     plt.figure(figsize=(8, 8))
+#     ax = WindroseAxes.from_ax()
+#     ax.bar(wind_dir80_clean[mask], wind_speed80_clean[mask], normed=True, opening=0.8, edgecolor='white', bins=SPEED_BINS)
+#     ax.set_ylim(0, RMAX)
+#     ax.set_rgrids(np.linspace(0, RMAX, 5)[1:], labels=[f'{r:.0f}%' for r in np.linspace(0, RMAX, 5)[1:]])
+#     ax.set_legend(title='Wind Speed [m/s]')
+#     ax.set_title(f' M2 Wind Rose at 80m - Month {month}')
+#     plt.show()
+
+#######################################
+# Finding Relevent Events from finding extreme events
