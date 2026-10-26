@@ -84,7 +84,7 @@ if not nc_files_z02:
     raise FileNotFoundError(f"No NetCDF files found in directory: {dfp_z02}")
 
 #each file has a time cordinate, so combine them directly along it.
-ds_z02 = xr.open_mfdataset(nc_files_z02, combine='nested', concat_dim='time', parallel=True,
+ds_z02 = xr.open_mfdataset(nc_files_z02, combine='nested', concat_dim='time',
                            data_vars='minimal', coords='minimal', compat='override')
 ds_z02 = ds_z02.isel(time=ds_z02['time'].notnull().values).sortby('time')
 ds_z02 = ds_z02.isel(time=~ds_z02.get_index('time').duplicated())
@@ -209,56 +209,26 @@ z02_80m_ws = ds_z02['wind_speed'].sel(distance=80, method='nearest').load()
 # m2_80m_col = 'Avg Wind Speed @ 80m [m/s]'
 ds_m2_80m = ds_m2.loc[ds_m2[m2_80m_col] > 0, ['UTC_time', m2_80m_col]]  # NaN fails > 0 too
 
-for month in hist_months:
-    z02_month = z02_80m_ws.sel(time=z02_80m_ws['time'].dt.month == month)
-    # use the Z02-aligned M2 where Z02 exists; otherwise (October) use all M2 data
-    m2_src = ds_m2_80m if z02_month.size > 0 else m2_all_80m
-    m2_month = m2_src.loc[m2_src['UTC_time'].dt.month == month]
-    z02_wind_speeds = z02_month.values.flatten()
-    z02_wind_speeds = z02_wind_speeds[z02_wind_speeds > 0]
-    m2_wind_speeds = m2_month[m2_80m_col].loc[m2_month[m2_80m_col] > 0]
-    if len(z02_wind_speeds) < 2 and len(m2_wind_speeds) < 2:
-        continue
-    plt.figure(figsize=(12, 6))
-    if len(z02_wind_speeds) >= 2:
-        plt.hist(z02_wind_speeds, bins=30, alpha=0.5, color='mediumorchid', label='Z02 80m Wind Speed', density=True)
-        shape, loc, scale = stats.weibull_min.fit(z02_wind_speeds, floc=0)
-        x = np.linspace(z02_wind_speeds.min(), z02_wind_speeds.max(), 200)
-        plt.plot(x, stats.weibull_min.pdf(x, shape, loc, scale), color='black', label=f'Z02 Weibull fit (k={shape:.2f}, c={scale:.2f} m/s)')
-    if len(m2_wind_speeds) >= 2:
-        plt.hist(m2_wind_speeds, bins=30, alpha=0.5, color='red', label='M2 80m Wind Speed', density=True)
-        shape, loc, scale = stats.weibull_min.fit(m2_wind_speeds, floc=0)
-        x = np.linspace(m2_wind_speeds.min(), m2_wind_speeds.max(), 200)
-        plt.plot(x, stats.weibull_min.pdf(x, shape, loc, scale), color='black', linestyle='--', label=f'M2 Weibull fit (k={shape:.2f}, c={scale:.2f} m/s)')
-    plt.xlabel('Wind Speed (m/s)')
-    plt.ylabel('Frequency (probability density)')
-    plt.title(f'80m Wind Speed Distribution (Month: {month}, 2026)')
-    plt.legend()
-    plt.tight_layout()
-    plt.grid(True, alpha=0.2, ls='--')
-    plt.show() 
-
-############################################################################################################
-# Make the frequency distribution and fit line of wind speed for 80 m with the M2 and Z02 datasets
-# for month in sorted(months):
+# for month in hist_months:
 #     z02_month = z02_80m_ws.sel(time=z02_80m_ws['time'].dt.month == month)
-#     z02_month = z02_month.where(z02_month > 0, drop=True)
-#     z02_ws = z02_month.values.flatten()
-#     z02_ws = z02_ws[~np.isnan(z02_ws)]
-#     m2_month = ds_m2_80m.loc[ds_m2_80m['UTC_time'].dt.month == month]
-#     m2_ws = m2_month[m2_80m_col].to_numpy()
-#     if len(z02_ws) < 2 and len(m2_ws) < 2:
+#     # use the Z02-aligned M2 where Z02 exists; otherwise (October) use all M2 data
+#     m2_src = ds_m2_80m if z02_month.size > 0 else m2_all_80m
+#     m2_month = m2_src.loc[m2_src['UTC_time'].dt.month == month]
+#     z02_wind_speeds = z02_month.values.flatten()
+#     z02_wind_speeds = z02_wind_speeds[z02_wind_speeds > 0]
+#     m2_wind_speeds = m2_month[m2_80m_col].loc[m2_month[m2_80m_col] > 0]
+#     if len(z02_wind_speeds) < 2 and len(m2_wind_speeds) < 2:
 #         continue
 #     plt.figure(figsize=(12, 6))
-#     if len(z02_ws) >= 2:
-#         plt.hist(z02_ws, bins=30, alpha=0.5, color='pink', label='Z02 80m Wind Speed', density=True)
-#         shape, loc, scale = stats.weibull_min.fit(z02_ws, floc=0)
-#         x = np.linspace(z02_ws.min(), z02_ws.max(), 200)
+#     if len(z02_wind_speeds) >= 2:
+#         plt.hist(z02_wind_speeds, bins=30, alpha=0.5, color='mediumorchid', label='Z02 80m Wind Speed', density=True)
+#         shape, loc, scale = stats.weibull_min.fit(z02_wind_speeds, floc=0)
+#         x = np.linspace(z02_wind_speeds.min(), z02_wind_speeds.max(), 200)
 #         plt.plot(x, stats.weibull_min.pdf(x, shape, loc, scale), color='black', label=f'Z02 Weibull fit (k={shape:.2f}, c={scale:.2f} m/s)')
-#     if len(m2_ws) >= 2:
-#         plt.hist(m2_ws, bins=30, alpha=0.5, color='red', label='M2 80m Wind Speed', density=True)
-#         shape, loc, scale = stats.weibull_min.fit(m2_ws, floc=0)
-#         x = np.linspace(m2_ws.min(), m2_ws.max(), 200)
+#     if len(m2_wind_speeds) >= 2:
+#         plt.hist(m2_wind_speeds, bins=30, alpha=0.5, color='red', label='M2 80m Wind Speed', density=True)
+#         shape, loc, scale = stats.weibull_min.fit(m2_wind_speeds, floc=0)
+#         x = np.linspace(m2_wind_speeds.min(), m2_wind_speeds.max(), 200)
 #         plt.plot(x, stats.weibull_min.pdf(x, shape, loc, scale), color='black', linestyle='--', label=f'M2 Weibull fit (k={shape:.2f}, c={scale:.2f} m/s)')
 #     plt.xlabel('Wind Speed (m/s)')
 #     plt.ylabel('Frequency (probability density)')
@@ -266,118 +236,77 @@ for month in hist_months:
 #     plt.legend()
 #     plt.tight_layout()
 #     plt.grid(True, alpha=0.2, ls='--')
-#     plt.show()
+#     plt.show() 
 
-   ##############################################################
-   ###############################################################
-   # Wind Rose Analysis
-
+############################################################################################################
 ###################
-#make the wind rose month to month from the M2 dataset windspeed and wind direction
-m2_ws_10m = ds_m2['Avg Wind Speed @ 10m [m/s]']
-m2_wd_10m = ds_m2['Avg Wind Direction @ 10m [deg]']
-# for month in sorted(months):
-#      m2_month = ds_m2.loc[ds_m2['UTC_time'].dt.month == month]
-#      if len(m2_month) < 2:
-#          continue
-#      ws = m2_month['Avg Wind Speed @ 10m [m/s]'].to_numpy()
-#      wd = m2_month['Avg Wind Direction @ 10m [deg]'].to_numpy()
-#      valid = ~np.isnan(ws) & ~np.isnan(wd) & (ws > 0)
-#      ws, wd = ws[valid], wd[valid]
-#      if len(ws) < 2:
-#          continue
-#      fig = plt.figure(figsize=(8, 8))
-#      ax = WindroseAxes.from_ax(fig=fig)
-#      speed_bins = np.arange(0, np.ceil(ws.max()) + 2, 2)
-#      cmap = plt.get_cmap('viridis')
-#      ax.bar(wd, ws, normed=True, opening=0.8, edgecolor='white', bins=speed_bins, cmap=cmap)
-#      ax.set_title(f'M2 10m Wind Rose (Month: {month}, 2026)')
-#      # the windrose bars aren't a mappable, so build one that matches the speed-bin colors
-#      mappable = plt.cm.ScalarMappable(norm=mcolors.BoundaryNorm(speed_bins, cmap.N), cmap=cmap)
-#      fig.colorbar(mappable, ax=ax, ticks=speed_bins, shrink=0.7, pad=0.1, label='Wind Speed (m/s)')
-#      plt.tight_layout() 
-#      plt.show()
 
 ##############################################################
-#Make the wind rose month to month for 50m with the M2 and Z02 datasets
-m2_ws_50m = ds_m2['Avg Wind Speed @ 50m [m/s]']
-m2_wd_50m = ds_m2['Avg Wind Direction @ 50m [deg]']
-#For the M2 data only have the data not below 0[m/s] at 50m
-m2_ws_50m = m2_ws_50m[m2_ws_50m > 0]
+# Make a list of available heights that have wind speed data in the Z02 dataset 
+#load once and count the valid (non-NaN) values at every height in a single pass
+z02_ws_all = ds_z02['wind_speed'].load()
+valid_counts = z02_ws_all.notnull().sum(dim='time')
 
+for height, count in zip(valid_counts['distance'].values, valid_counts.values):
+    if count < 1:
+        continue
+    # print(f"Height: {height}, Number of wind speed measurements: {count}")
 
-z02_h = ds_z02['distance'] 
-z02_50m_ws = ds_z02['wind_speed'].sel(distance=50, method='nearest').load()
-z02_50m_wd = ds_z02['wind_direction'].sel(distance=50, method='nearest').load()
+###########################################################
+#Make a linear regression plot for wind speed at different heights 
+#with the M2 and the Z02 datasets (in different colors) 
+# get the M2 wind speed data
+m2_ws_2 = ds_m2['Avg Wind Speed @ 2m [m/s]']
+m2_ws_5 = ds_m2['Avg Wind Speed @ 5m [m/s]']
+m2_ws_10 = ds_m2['Avg Wind Speed @ 10m [m/s]']
+m2_ws_20 = ds_m2['Avg Wind Speed @ 20m [m/s]']
+m2_ws_50 = ds_m2['Avg Wind Speed @ 50m [m/s]']
+m2_ws_80 = ds_m2['Avg Wind Speed @ 80m [m/s]']
 
+# get the z02 wind speed data at all of it avaible heights
+z02_ws_40 = ds_z02['wind_speed'].sel(distance=40).load()
+z02_ws_60 = ds_z02['wind_speed'].sel(distance=60).load()
+z02_ws_80 = ds_z02['wind_speed'].sel(distance=80).load()
+z02_ws_100 = ds_z02['wind_speed'].sel(distance=100).load()
+z02_ws_120 = ds_z02['wind_speed'].sel(distance=120).load()
+z02_ws_140 = ds_z02['wind_speed'].sel(distance=140).load()
+z02_ws_160 = ds_z02['wind_speed'].sel(distance=160).load()
+z02_ws_180 = ds_z02['wind_speed'].sel(distance=180).load()
+z02_ws_200 = ds_z02['wind_speed'].sel(distance=200).load()
+z02_ws_220 = ds_z02['wind_speed'].sel(distance=220).load()
+z02_ws_240 = ds_z02['wind_speed'].sel(distance=240).load()
+z02_ws_260 = ds_z02['wind_speed'].sel(distance=260).load()
+z02_ws_280 = ds_z02['wind_speed'].sel(distance=280).load()
+z02_ws_300 = ds_z02['wind_speed'].sel(distance=300).load()
 
-# for month in sorted(months):
-#      m2_month = ds_m2.loc[ds_m2['UTC_time'].dt.month == month]
-#      z02_month = z02_50m_ws.sel(time=z02_50m_ws['time'].dt.month == month)
-#      if len(m2_month) < 2 and z02_month.size < 2:
-#          continue
-#      fig = plt.figure(figsize=(8, 8))
-#      ax = WindroseAxes.from_ax(fig=fig)
-#      if len(m2_month) >= 2:
-#          ws = m2_month['Avg Wind Speed @ 50m [m/s]'].to_numpy()
-#          wd = m2_month['Avg Wind Direction @ 50m [deg]'].to_numpy()
-#          valid = ~np.isnan(ws) & ~np.isnan(wd) & (ws > 0)
-#          ws, wd = ws[valid], wd[valid]
-#          if len(ws) >= 2:
-#              speed_bins = np.arange(0, np.ceil(ws.max()) + 2, 2)
-#              cmap = plt.get_cmap('viridis')
-#              ax.bar(wd, ws, normed=True, opening=0.8, edgecolor='white', bins=speed_bins, cmap=cmap)
-#      if z02_month.size >= 2:
-#          ws = z02_month.to_numpy()
-#          wd = z02_50m_wd.sel(time=z02_month['time']).to_numpy()
-#          valid = ~np.isnan(ws) & ~np.isnan(wd) & (ws > 0)
-#          ws, wd = ws[valid], wd[valid]
-#          if len(ws) >= 2:
-#              speed_bins = np.arange(0, np.ceil(ws.max()) + 2, 2)
-#              cmap = plt.get_cmap('viridis')
-#              ax.bar(wd, ws, normed=True, opening=0.8, edgecolor='white', bins=speed_bins, cmap=cmap)
-#      ax.set_title(f'M2 and lidar.Z02 50m Wind Rose (Month: {month}, 2026)')
-#      mappable = plt.cm.ScalarMappable(norm=mcolors.BoundaryNorm(speed_bins, cmap.N), cmap=cmap)
-#      fig.colorbar(mappable, ax=ax, ticks=speed_bins, shrink=0.7, pad=0.1, label='Wind Speed (m/s)')
-#      plt.tight_layout()
-#      plt.show()
-########################################
-# Make a wind rose at 80m with the M2 and Z02 datasets
-# m2_ws_80m = ds_m2['Avg Wind Speed @ 80m [m/s]']
-# m2_wd_80m = ds_m2['Avg Wind Direction @ 80m [deg]']
-# #For the M2 data only have the data not below 0[m/s] at 80m
-# m2_ws_80m = m2_ws_80m[m2_ws_80m > 0]
+######################################################## 
+# Now you can proceed to create linear regression plots for the wind speed at different heights
+# using the M2 and Z02 datasets.
+m2_ws_by_height = {20: m2_ws_20, 50: m2_ws_50, 80: m2_ws_80}
+z02_ws_by_height = {40: z02_ws_40, 60: z02_ws_60, 80: z02_ws_80}
 
-# z02_80m_ws = ds_z02['wind_speed'].sel(distance=80, method='nearest').load()
-# z02_80m_wd = ds_z02['wind_direction'].sel(distance=80, method='nearest').load()
+# closest-height pairs (M2 height, Z02 height)
+height_pairs = [(20, 40), (50, 40), (50, 60), (80, 80)]
 
-# for month in sorted(months):
-#      m2_month = ds_m2.loc[ds_m2['UTC_time'].dt.month == month]
-#      z02_month = z02_80m_ws.sel(time=z02_80m_ws['time'].dt.month == month)
-#      if len(m2_month) < 2 and z02_month.size < 2:
-#          continue
-#      fig = plt.figure(figsize=(8, 8))
-#      ax = WindroseAxes.from_ax(fig=fig)
-#      if len(m2_month) >= 2:
-#          ws = m2_month['Avg Wind Speed @ 80m [m/s]'].to_numpy()
-#          wd = m2_month['Avg Wind Direction @ 80m [deg]'].to_numpy()
-#          valid = ~np.isnan(ws) & ~np.isnan(wd) & (ws > 0)
-#          ws, wd = ws[valid], wd[valid]
-#          if len(ws) >= 2:
-#              speed_bins = np.arange(0, np.ceil(ws.max()) + 2, 2)
-#              cmap = plt.get_cmap('viridis')
-#              ax.bar(wd, ws, normed=True, opening=0.8, edgecolor='white', bins=speed_bins, cmap=cmap)
-#      if z02_month.size >= 2:
-#          ws = z02_month.to_numpy()
-#          wd = z02_80m_wd.sel(time=z02_month['time']).to_numpy()
-#          valid = ~np.isnan(ws) & ~np.isnan(wd) & (ws > 0)
-#          ws, wd = ws[valid], wd[valid]
-#          if len(ws) >= 2:
-#              speed_bins = np.arange(0, np.ceil(ws.max()) + 2, 2)
-#              cmap = plt.get_cmap('viridis')
-#              ax.bar(wd, ws, normed=True, opening=0.8, edgecolor='white', bins=speed_bins, cmap=cmap)
-#      ax.set_title(f'M2 and lidar.Z02 80m Wind Rose (Month: {month}, 2026)')
-#      mappable = plt.cm.ScalarMappable(norm=mcolors.BoundaryNorm(speed_bins, cmap.N), cmap=cmap)
-#      fig.colorbar(mappable, ax=ax, ticks=speed_bins, shrink=0.7, pad=0.1, label='Wind Speed (m/s)')
-#      plt.tight_layout()
-#      plt.show()
+# ds_m2 and ds_z02 were aligned on the same UTC times, so the samples pair up positionally
+fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+for ax, (m2_h, z02_h_sel) in zip(axes.ravel(), height_pairs):
+    x = np.asarray(m2_ws_by_height[m2_h], dtype=float).ravel()
+    y = np.asarray(z02_ws_by_height[z02_h_sel], dtype=float).ravel()
+    keep = np.isfinite(x) & np.isfinite(y) & (x > 0) & (y > 0)
+    x, y = x[keep], y[keep]
+
+    slope, intercept, r, p, se = stats.linregress(x, y)
+    xs = np.linspace(x.min(), x.max(), 200)
+    ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
+    ax.plot(xs, slope * xs + intercept, color='red', lw=2,
+            label=f'y = {slope:.2f}x + {intercept:.2f}\n$R^2$ = {r**2:.3f}, n = {x.size}')
+    ax.set_xlabel(f'M2 Wind Speed at {m2_h}m (m/s)')
+    ax.set_ylabel(f'Z02 Wind Speed at {z02_h_sel}m (m/s)')
+    ax.set_title(f'M2 {m2_h}m vs Z02 {z02_h_sel}m')
+    ax.grid(True, alpha=0.2, ls='--')
+    ax.legend(loc='upper left')
+plt.tight_layout()
+plt.show()
+
+#################################################
