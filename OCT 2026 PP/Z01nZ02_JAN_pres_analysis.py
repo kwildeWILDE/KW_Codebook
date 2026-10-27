@@ -96,6 +96,10 @@ print(ds_merged)
 # group the merged dataset by month and hour to calculate the mean wind speed profiles
 ds_merged = ds_merged.assign_coords(month=('time', ds_merged['time'].dt.month.values),
                                     hour=('time', ds_merged['time'].dt.hour.values))
+#combine Z01 and Z02 at every time step first (average where both exist, otherwise whichever exists)
+ds_merged['WS_comb'] = xr.concat([ds_merged['WS_z01'], ds_merged['WS_z02']],
+                                 dim='src').mean('src', skipna=True)
+#then, for each month and hour of day, average over all days of that month at that hour (per height)
 mean_wind_profiles = (ds_merged.groupby(['month', 'hour']).mean(dim='time'))
 print("Mean wind speed profiles (month x hour x height):")
 print(mean_wind_profiles)
@@ -114,14 +118,16 @@ overall = ds_merged[['WS_z01', 'WS_z02']].mean(dim='time')
 
 #########################
 # MONTHLY DIURNAL CYCLE PANELS: color = mean wind speed (hour x height)
-#combined profile: average of Z01 and Z02 where both exist (40-300 m), Z01 only elsewhere
-mean_wind_profiles['WS_comb'] = xr.concat([mean_wind_profiles['WS_z01'], mean_wind_profiles['WS_z02']],
-                                          dim='src').mean('src', skipna=True)
+#combined profile WS_comb is computed per time step above
 ws_var = 'WS_comb'
 max_height = 500   #m AGL upper limit of the plots
 months = [m for m in range(1, 13) if m in mean_wind_profiles['month'].values]
-vmin = float(mean_wind_profiles[ws_var].min())
-vmax = float(mean_wind_profiles[ws_var].max())
+min_count = 10   #points with fewer than this many valid samples in the month/hour average are left blank
+counts = ds_merged['WS_comb'].groupby(['month', 'hour']).count(dim='time')
+ws_masked = mean_wind_profiles[ws_var].where(counts >= min_count)
+#tight color scale from the data that remains
+vmin = float(np.floor(ws_masked.min()))
+vmax = float(np.ceil(ws_masked.max()))
 
 #only plot months that have data
 ncols = min(6, len(months))
@@ -132,7 +138,7 @@ for ax in axes.flat[len(months):]:
     ax.set_visible(False)
 for ax, month in zip(axes.flat, months):
     ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
-    prof = mean_wind_profiles[ws_var].sel(month=month).transpose('height', 'hour')
+    prof = ws_masked.sel(month=month).transpose('height', 'hour')
     prof = prof.sel(height=slice(0, max_height))
     hrs, hts = prof['hour'].values, prof['height'].values
     pcm = ax.pcolormesh(hrs, hts, prof.values, cmap='viridis', vmin=vmin, vmax=vmax, shading='nearest')
