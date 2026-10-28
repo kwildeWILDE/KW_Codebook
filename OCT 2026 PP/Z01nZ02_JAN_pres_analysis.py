@@ -29,16 +29,12 @@ if not nc_files_z01:
 #so concatenate along time, drop NaT/duplicate times, then sort.
 ds_z01 = xr.open_mfdataset(nc_files_z01, combine='nested', concat_dim='time',
                            data_vars='minimal', coords='minimal', compat='override')
+#keep only what the plot needs (WS, heights <= 500 m) and load it into memory once
+ds_z01 = ds_z01[['WS']].sel(height=slice(0, 500))
 ds_z01 = ds_z01.isel(time=ds_z01['time'].notnull().values).sortby('time')
-ds_z01 = ds_z01.isel(time=~ds_z01.get_index('time').duplicated())
+ds_z01 = ds_z01.isel(time=~ds_z01.get_index('time').duplicated()).load()
 
 print("Successfully loaded S40 LIDAR Z01 C1 data.")
-print(ds_z01.head())
-print('##' * 40)
-z01_time = ds_z01['time']
-print(z01_time)
-ds_z01['datetime'] = ('time', pd.to_datetime(ds_z01['time'].astype(str).values))
-print(ds_z01['datetime'])
 
 ##############################################
 ###PULLING THE DATA FROM THE S40.LIDAR.Z02.C0 FROM WDH ################
@@ -54,22 +50,14 @@ if not nc_files_z02:
 #each file has a time cordinate, so combine them directly along it.
 ds_z02 = xr.open_mfdataset(nc_files_z02, combine='nested', concat_dim='time',
                            data_vars='minimal', coords='minimal', compat='override')
+ds_z02 = ds_z02[['wind_speed']]
 ds_z02 = ds_z02.isel(time=ds_z02['time'].notnull().values).sortby('time')
-ds_z02 = ds_z02.isel(time=~ds_z02.get_index('time').duplicated())
+ds_z02 = ds_z02.isel(time=~ds_z02.get_index('time').duplicated()).load()
 
 print("Successfully loaded S40 LIDAR Z02 C0 data.")
-print(ds_z02.head(10))
-
-#######################################################
-#make sure the time coordinates between Z01 and Z02 datasets are aligned
-z02_time = ds_z02['time']
-print(z02_time)
-ds_z02['time'] = ('time', pd.to_datetime(ds_z02['time'].astype(str).values))
-print(ds_z02['time'])
 
 #Z01 time stamps are irregular (~30 min scans, e.g. 21:39:46) while Z02 is on an exact
 #10-min grid, so an exact-match intersection is empty. Average both onto a common 30-min grid.
-ds_z01 = ds_z01.drop_vars('datetime', errors='ignore')
 z01_30 = ds_z01.resample(time='30min').mean()
 
 #Z02: only keep the wind speed profile, use the same dimension/variable naming as Z01
@@ -121,7 +109,7 @@ overall = ds_merged[['WS_z01', 'WS_z02']].mean(dim='time')
 #combined profile WS_comb is computed per time step above
 ws_var = 'WS_comb'
 max_height = 500   #m AGL upper limit of the plots
-months = [m for m in range(1, 13) if m in mean_wind_profiles['month'].values]
+months = [m for m in range(3, 13) if m in mean_wind_profiles['month'].values]
 min_count = 10   #points with fewer than this many valid samples in the month/hour average are left blank
 counts = ds_merged['WS_comb'].groupby(['month', 'hour']).count(dim='time')
 ws_masked = mean_wind_profiles[ws_var].where(counts >= min_count)
@@ -130,28 +118,65 @@ ws_masked = mean_wind_profiles[ws_var].where(counts >= min_count)
 vmin = 3 # set minimum wind speed for color scale
 # vmax = float(np.ceil(ws_masked.max()))
 vmax = 10 # set maximum wind speed for color scale
+levels = np.linspace(vmin, vmax, 15)   #contourf ignores vmin/vmax unless levels are given
 
 #only plot months that have data
-ncols = min(6, len(months))
-nrows = int(np.ceil(len(months) / ncols))
-fig, axes = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3.5 * nrows),
-                         sharex=True, sharey=True, squeeze=False, layout='constrained')
-for ax in axes.flat[len(months):]:
-    ax.set_visible(False)
-for ax, month in zip(axes.flat, months):
-    ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
-    prof = ws_masked.sel(month=month).transpose('height', 'hour')
-    prof = prof.sel(height=slice(0, max_height))
-    hrs, hts = prof['hour'].values, prof['height'].values
-    pcm = ax.pcolormesh(hrs, hts, prof.values, cmap='viridis', vmin=vmin, vmax=vmax, shading='nearest')
-    ax.set_xticks([0, 6, 12, 18])
-    ax.set_ylim(0, max_height)
-for ax in axes[-1]:
-    ax.set_xlabel('Time (UTC)')
-for ax in axes[:, 0]:
-    ax.set_ylabel('Height (m AGL)')
-#colorbar and legend sit below the panels so they don't crowd the plots
-fig.colorbar(pcm, ax=axes, location='bottom', shrink=0.5, aspect=40, pad=0.03,
-             label='Mean wind speed (m/s)')
-fig.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02', fontsize=10)
+# ncols = min(6, len(months))
+# nrows = int(np.ceil(len(months) / ncols))
+# fig, axes = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3.5 * nrows),
+#                          sharex=True, sharey=True, squeeze=False, layout='constrained')
+# for ax in axes.flat[len(months):]:
+#     ax.set_visible(False)
+# for ax, month in zip(axes.flat, months):
+#     ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
+#     prof = ws_masked.sel(month=month).transpose('height', 'hour')
+#     prof = prof.sel(height=slice(0, max_height))
+#     hrs, hts = prof['hour'].values, prof['height'].values
+#     # use contourf + contour to make it less pixelated
+#     pcm = ax.contourf(hrs, hts, prof.values, levels=levels, cmap='viridis', extend='both')
+#     ax.contour(hrs, hts, prof.values, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
+#     ax.set_xticks([0, 6, 12, 18])
+#     ax.set_ylim(0, max_height)
+# for ax in axes[-1]:
+#     ax.set_xlabel('Time (UTC)')
+# for ax in axes[:, 0]:
+#     ax.set_ylabel('Height (m AGL)')
+# #colorbar and legend sit below the panels so they don't crowd the plots
+# fig.colorbar(pcm, ax=axes, location='bottom', shrink=0.5, aspect=40, pad=0.03,
+#              label='Mean wind speed (m/s)')
+# fig.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02', fontsize=10)
+# plt.show()
+
+###################################################################################
+# Make a linear regression plot from the wind speeds from z01 and z02 at the same heights and times
+# to see if there is agreement between the two lidars
+z01_var = 'WS_z01'
+z02_var = 'WS_z02'
+
+# select only the times and heights where both lidars have data
+common_mask = ds_merged[z01_var].notnull() & ds_merged[z02_var].notnull()
+ws_z01_common = ds_merged[z01_var].where(common_mask)
+ws_z02_common = ds_merged[z02_var].where(common_mask)
+
+# flatten the data for regression plotting
+ws_z01_flat = ws_z01_common.values.flatten()
+ws_z02_flat = ws_z02_common.values.flatten()
+
+# remove NaNs from the flattened arrays
+valid_mask = ~np.isnan(ws_z01_flat) & ~np.isnan(ws_z02_flat)
+ws_z01_flat = ws_z01_flat[valid_mask]
+ws_z02_flat = ws_z02_flat[valid_mask]
+
+# create the linear regression plot
+plt.figure(figsize=(6, 6))
+plt.scatter(ws_z01_flat, ws_z02_flat, alpha=0.5)
+plt.xlabel('Z01 Wind Speed (m/s)')
+plt.ylabel('Z02 Wind Speed (m/s)')
+plt.title('Linear Regression of Wind Speeds from Z01 and Z02')
+# fit a linear regression line
+# calculate the slope and intercept for the linear regression line
+# calculate the slope and intercept for the linear regression line using numpy's polyfit function
+m, b = np.polyfit(ws_z01_flat, ws_z02_flat, 1)
+plt.plot(ws_z01_flat, m * ws_z01_flat + b, color='red', label='Linear Fit (y = {:.2f}x + {:.2f})'.format(m, b))
+plt.legend(loc='best')
 plt.show()
