@@ -126,8 +126,10 @@ min_count = 10   #points with fewer than this many valid samples in the month/ho
 counts = ds_merged['WS_comb'].groupby(['month', 'hour']).count(dim='time')
 ws_masked = mean_wind_profiles[ws_var].where(counts >= min_count)
 #tight color scale from the data that remains
-vmin = float(np.floor(ws_masked.min()))
-vmax = float(np.ceil(ws_masked.max()))
+#vmin = float(np.floor(ws_masked.min()))
+vmin = 3 # set minimum wind speed for color scale
+# vmax = float(np.ceil(ws_masked.max()))
+vmax = 10 # set maximum wind speed for color scale
 
 #only plot months that have data
 ncols = min(6, len(months))
@@ -151,5 +153,5 @@ for ax in axes[:, 0]:
 #colorbar and legend sit below the panels so they don't crowd the plots
 fig.colorbar(pcm, ax=axes, location='bottom', shrink=0.5, aspect=40, pad=0.03,
              label='Mean wind speed (m/s)')
-fig.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from combined lidar Z01 and Z02', fontsize=10)
+fig.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02', fontsize=10)
 plt.show()
