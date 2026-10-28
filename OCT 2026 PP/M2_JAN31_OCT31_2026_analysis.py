@@ -333,4 +333,32 @@ both_outliers_df = pd.DataFrame({
 })
 print("Both outliers:")
 print(both_outliers_df)
-both_outliers_df.to_csv('both_outliers.csv', index=False)
+# both_outliers_df.to_csv('both_outliers.csv', index=False)
+
+########################################### 
+#Now that we have a method to filter out when both of the outliers happen at the same time, 
+# we can can see the frequency of when both outliers occur simultaneously
+#an exmple is to create a month to month frquency histogtram with a weibull fit of when the outliers occur simultaneously
+#over time of the day (0 - 23 hours)
+#for the 
+both_outliers_times = pd.Series(pd.to_datetime(both_outliers_times.to_numpy()))
+for month in range(1, 13):
+    both_outliers_month = both_outliers_times[both_outliers_times.dt.month == month]
+    if both_outliers_month.empty:
+        continue
+    both_outliers_hours = both_outliers_month.dt.hour.to_numpy()
+    plt.figure(figsize=(10, 6))
+    plt.hist(both_outliers_hours, bins=np.arange(0, 25) - 0.5, edgecolor='black', alpha=0.7,
+             label=f'Observed, (n={len(both_outliers_hours)})')
+    #Weibull fit (location fixed at 0); shift by 0.5 so hour 0 is valid, scale pdf to counts
+    if len(np.unique(both_outliers_hours)) > 1:
+        shape, loc, scale = weibull_min.fit(both_outliers_hours + 0.5, floc=0)
+        xs = np.linspace(0, 24, 200)
+        plt.plot(xs, weibull_min.pdf(xs + 0.5, shape, loc, scale) * len(both_outliers_hours),
+                 'r-', lw=2, label=f'Weibull fit (k={shape:.2f}, c={scale:.2f})')
+    plt.legend()
+    plt.xlabel('Hour of the Day')
+    plt.ylabel('Frequency of Both Outliers')
+    plt.title(f'M2 Frequency of Both Outliers @ 50m Occurring Simultaneously by Hour of the Day for month {month}', fontsize=8)
+    plt.xticks(range(0, 24))
+    plt.show()
