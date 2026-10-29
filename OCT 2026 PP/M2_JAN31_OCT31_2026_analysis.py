@@ -122,16 +122,21 @@ RMAX = 20                         # fixed max radial frequency (%) shared by all
 #     plt.show()
 ################################
 #Wind rose for 80m month to month
-# for month in range(2, 11):
-#     mask = (time.dt.month == month) & wind_dir80_clean.notna() & wind_speed80_clean.notna()
-#     plt.figure(figsize=(8, 8))
-#     ax = WindroseAxes.from_ax()
-#     ax.bar(wind_dir80_clean[mask], wind_speed80_clean[mask], normed=True, opening=0.8, edgecolor='white', bins=SPEED_BINS)
-#     ax.set_ylim(0, RMAX)
-#     ax.set_rgrids(np.linspace(0, RMAX, 5)[1:], labels=[f'{r:.0f}%' for r in np.linspace(0, RMAX, 5)[1:]])
-#     ax.set_legend(title='Wind Speed [m/s]')
-#     ax.set_title(f' M2 Wind Rose at 80m - Month {month}')
-#     plt.show()
+fig = plt.figure(figsize=(14, 14))
+gs = fig.add_gridspec(3, 3, wspace=0.3, hspace=0.3)
+for i, month in enumerate(range(2, 11)):
+    mask = (time.dt.month == month) & wind_dir80_clean.notna() & wind_speed80_clean.notna()
+    ax = WindroseAxes(fig, gs[i // 3, i % 3].get_position(fig))
+    fig.add_axes(ax)
+    ax.bar(wind_dir80_clean[mask], wind_speed80_clean[mask], normed=True, opening=0.8, edgecolor='white', bins=SPEED_BINS)
+    ax.set_ylim(0, RMAX)
+    ax.set_rgrids(np.linspace(0, RMAX, 5)[1:], labels=[f'{r:.0f}%' for r in np.linspace(0, RMAX, 5)[1:]])
+    ax.set_title(f'Month {month}')
+    if i == 0:
+        ax.set_legend(title='Wind Speed [m/s]', loc='best', bbox_to_anchor=(-0.3, 1.0))
+fig.suptitle('M2 Wind Rose at 80m - Monthly (Feb-Oct 2026, common scale)')
+plt.tight_layout()
+plt.show()
 
 #######################################
 # Finding Relevent Events from finding extreme events
@@ -145,23 +150,23 @@ temperature50_clean = mask_flat_runs(temp50)
 
 #Day/night regimes from solar elevation (NOAA approximation) at the M2 site, using MST (UTC-7, no DST).
 #Daytime = sun center above -0.833 deg (standard sunrise/sunset definition, includes refraction).
-M2_LAT, M2_LON, MST_OFFSET_HR = 39.91, -105.23, -7
+# M2_LAT, M2_LON, MST_OFFSET_HR = 39.91, -105.23, -7
 
-def is_daytime(t, lat=M2_LAT, lon=M2_LON, tz=MST_OFFSET_HR):
-    hour = t.dt.hour + t.dt.minute / 60 + t.dt.second / 3600
-    g = 2 * np.pi / 365 * (t.dt.dayofyear - 1 + (hour - 12) / 24)
-    eqtime = 229.18 * (0.000075 + 0.001868 * np.cos(g) - 0.032077 * np.sin(g)
-                       - 0.014615 * np.cos(2 * g) - 0.040849 * np.sin(2 * g))
-    decl = (0.006918 - 0.399912 * np.cos(g) + 0.070257 * np.sin(g) - 0.006758 * np.cos(2 * g)
-            + 0.000907 * np.sin(2 * g) - 0.002697 * np.cos(3 * g) + 0.00148 * np.sin(3 * g))
-    tst = hour * 60 + eqtime + 4 * lon - 60 * tz
-    ha = np.radians(tst / 4 - 180)
-    lat_r = np.radians(lat)
-    sin_elev = np.sin(lat_r) * np.sin(decl) + np.cos(lat_r) * np.cos(decl) * np.cos(ha)
-    return (np.degrees(np.arcsin(sin_elev)) > -0.833).to_numpy()
+# def is_daytime(t, lat=M2_LAT, lon=M2_LON, tz=MST_OFFSET_HR):
+#     hour = t.dt.hour + t.dt.minute / 60 + t.dt.second / 3600
+#     g = 2 * np.pi / 365 * (t.dt.dayofyear - 1 + (hour - 12) / 24)
+#     eqtime = 229.18 * (0.000075 + 0.001868 * np.cos(g) - 0.032077 * np.sin(g)
+#                        - 0.014615 * np.cos(2 * g) - 0.040849 * np.sin(2 * g))
+#     decl = (0.006918 - 0.399912 * np.cos(g) + 0.070257 * np.sin(g) - 0.006758 * np.cos(2 * g)
+#             + 0.000907 * np.sin(2 * g) - 0.002697 * np.cos(3 * g) + 0.00148 * np.sin(3 * g))
+#     tst = hour * 60 + eqtime + 4 * lon - 60 * tz
+#     ha = np.radians(tst / 4 - 180)
+#     lat_r = np.radians(lat)
+#     sin_elev = np.sin(lat_r) * np.sin(decl) + np.cos(lat_r) * np.cos(decl) * np.cos(ha)
+#     return (np.degrees(np.arcsin(sin_elev)) > -0.833).to_numpy()
 
-is_day = is_daytime(time)
-REGIMES = {'Daytime': is_day, 'Nighttime': ~is_day}
+# is_day = is_daytime(time)
+# REGIMES = {'Daytime': is_day, 'Nighttime': ~is_day}
 
 # #create a month by month basis bi_vibrate KDE joint PDF ellipses plots with raw scatter overlay beween 50m wind speed and temperature 
 # for month in range(2, 11):
@@ -249,34 +254,34 @@ turbi50_clean = turbi50.where(turbi50.notnull(), np.nan)
 
 #Outliers = samples outside the outermost KDE contour (density below the lowest contour level),
 #computed per month and per day/night regime, exactly like the KDE plots above.
-def kde_outliers(a, b, base_mask, levels=15):
-    out = np.zeros(len(a), dtype=bool)
-    a, b = np.asarray(a), np.asarray(b)
-    idx = np.where(base_mask & ~(np.isnan(a) | np.isnan(b)))[0]
-    if idx.size < 3:
-        return out
-    kde = gaussian_kde(np.vstack([a[idx], b[idx]]))
-    x = np.linspace(a[idx].min(), a[idx].max(), 100)
-    y = np.linspace(b[idx].min(), b[idx].max(), 100)
-    X, Y = np.meshgrid(x, y)
-    Z = kde(np.vstack([X.ravel(), Y.ravel()]))
-    lowest_level = Z.min() + (Z.max() - Z.min()) / levels
-    out[idx] = kde(np.vstack([a[idx], b[idx]])) < lowest_level
-    return out
+# def kde_outliers(a, b, base_mask, levels=15):
+#     out = np.zeros(len(a), dtype=bool)
+#     a, b = np.asarray(a), np.asarray(b)
+#     idx = np.where(base_mask & ~(np.isnan(a) | np.isnan(b)))[0]
+#     if idx.size < 3:
+#         return out
+#     kde = gaussian_kde(np.vstack([a[idx], b[idx]]))
+#     x = np.linspace(a[idx].min(), a[idx].max(), 100)
+#     y = np.linspace(b[idx].min(), b[idx].max(), 100)
+#     X, Y = np.meshgrid(x, y)
+#     Z = kde(np.vstack([X.ravel(), Y.ravel()]))
+#     lowest_level = Z.min() + (Z.max() - Z.min()) / levels
+#     out[idx] = kde(np.vstack([a[idx], b[idx]])) < lowest_level
+#     return out
 
-ws_arr = wind_speed50_clean.to_numpy()
-t_arr = temperature50_clean.to_numpy()
-ti_arr = turbi50_clean.to_numpy()
-month_arr = time.dt.month.to_numpy()
+# ws_arr = wind_speed50_clean.to_numpy()
+# t_arr = temperature50_clean.to_numpy()
+# ti_arr = turbi50_clean.to_numpy()
+# month_arr = time.dt.month.to_numpy()
 
-out_ws_t = np.zeros(len(time), dtype=bool)   # wind speed vs temperature outliers
-out_ti_ws = np.zeros(len(time), dtype=bool)  # turbulence intensity vs wind speed outliers
-for month in range(2, 11):
-    for regime_mask in REGIMES.values():
-        base = (month_arr == month) & regime_mask
-        out_ws_t |= kde_outliers(ws_arr, t_arr, base)
-        out_ti_ws |= kde_outliers(ws_arr, ti_arr, base)
-out_both = out_ws_t & out_ti_ws
+# out_ws_t = np.zeros(len(time), dtype=bool)   # wind speed vs temperature outliers
+# out_ti_ws = np.zeros(len(time), dtype=bool)  # turbulence intensity vs wind speed outliers
+# for month in range(2, 11):
+#     for regime_mask in REGIMES.values():
+#         base = (month_arr == month) & regime_mask
+#         out_ws_t |= kde_outliers(ws_arr, t_arr, base)
+#         out_ti_ws |= kde_outliers(ws_arr, ti_arr, base)
+# out_both = out_ws_t & out_ti_ws
 
 #Month to month time lines: wind speed '--', temperature '-', turbulence intensity '-.'
 #night = light grey background, day = white; outlier times highlighted yellow / red / orange (both)
@@ -320,19 +325,19 @@ out_both = out_ws_t & out_ti_ws
 #####################################################################################
 # From the plots above we have a visual when the both the outliers occur simultaneously and when they occur individually for each parameter combination
 # Print a list and save a cvs of when both the outliers occur simultaneously with the corresponding timestamps and the parameter values
-both_outliers_times = time[out_both]
-both_outliers_ws = ws_arr[out_both]
-both_outliers_t = t_arr[out_both]
-both_outliers_ti = ti_arr[out_both]
+# both_outliers_times = time[out_both]
+# both_outliers_ws = ws_arr[out_both]
+# both_outliers_t = t_arr[out_both]
+# both_outliers_ti = ti_arr[out_both]
 
-both_outliers_df = pd.DataFrame({
-    'Timestamp': both_outliers_times,
-    'Wind Speed @ 50m [m/s]': both_outliers_ws,
-    'Temperature @ 50m [deg C]': both_outliers_t,
-    'Turbulence Intensity @ 50m': both_outliers_ti
-})
-print("Both outliers:")
-print(both_outliers_df)
+# both_outliers_df = pd.DataFrame({
+#     'Timestamp': both_outliers_times,
+#     'Wind Speed @ 50m [m/s]': both_outliers_ws,
+#     'Temperature @ 50m [deg C]': both_outliers_t,
+#     'Turbulence Intensity @ 50m': both_outliers_ti
+# })
+# print("Both outliers:")
+# print(both_outliers_df)
 # both_outliers_df.to_csv('both_outliers.csv', index=False)
 
 ########################################### 
@@ -341,24 +346,24 @@ print(both_outliers_df)
 #an exmple is to create a month to month frquency histogtram with a weibull fit of when the outliers occur simultaneously
 #over time of the day (0 - 23 hours)
 #for the 
-both_outliers_times = pd.Series(pd.to_datetime(both_outliers_times.to_numpy()))
-for month in range(1, 13):
-    both_outliers_month = both_outliers_times[both_outliers_times.dt.month == month]
-    if both_outliers_month.empty:
-        continue
-    both_outliers_hours = both_outliers_month.dt.hour.to_numpy()
-    plt.figure(figsize=(10, 6))
-    plt.hist(both_outliers_hours, bins=np.arange(0, 25) - 0.5, edgecolor='black', alpha=0.7,
-             label=f'Observed, (n={len(both_outliers_hours)})')
-    #Weibull fit (location fixed at 0); shift by 0.5 so hour 0 is valid, scale pdf to counts
-    if len(np.unique(both_outliers_hours)) > 1:
-        shape, loc, scale = weibull_min.fit(both_outliers_hours + 0.5, floc=0)
-        xs = np.linspace(0, 24, 200)
-        plt.plot(xs, weibull_min.pdf(xs + 0.5, shape, loc, scale) * len(both_outliers_hours),
-                 'r-', lw=2, label=f'Weibull fit (k={shape:.2f}, c={scale:.2f})')
-    plt.legend()
-    plt.xlabel('Hour of the Day')
-    plt.ylabel('Frequency of Both Outliers')
-    plt.title(f'M2 Frequency of Both Outliers @ 50m Occurring Simultaneously by Hour of the Day for month {month}', fontsize=8)
-    plt.xticks(range(0, 24))
-    plt.show()
+# both_outliers_times = pd.Series(pd.to_datetime(both_outliers_times.to_numpy()))
+# for month in range(1, 13):
+#     both_outliers_month = both_outliers_times[both_outliers_times.dt.month == month]
+#     if both_outliers_month.empty:
+#         continue
+#     both_outliers_hours = both_outliers_month.dt.hour.to_numpy()
+#     plt.figure(figsize=(10, 6))
+#     plt.hist(both_outliers_hours, bins=np.arange(0, 25) - 0.5, edgecolor='black', alpha=0.7,
+#              label=f'Observed, (n={len(both_outliers_hours)})')
+#     #Weibull fit (location fixed at 0); shift by 0.5 so hour 0 is valid, scale pdf to counts
+#     if len(np.unique(both_outliers_hours)) > 1:
+#         shape, loc, scale = weibull_min.fit(both_outliers_hours + 0.5, floc=0)
+#         xs = np.linspace(0, 24, 200)
+#         plt.plot(xs, weibull_min.pdf(xs + 0.5, shape, loc, scale) * len(both_outliers_hours),
+#                  'r-', lw=2, label=f'Weibull fit (k={shape:.2f}, c={scale:.2f})')
+#     plt.legend()
+#     plt.xlabel('Hour of the Day')
+#     plt.ylabel('Frequency of Both Outliers')
+#     plt.title(f'M2 Frequency of Both Outliers @ 50m Occurring Simultaneously by Hour of the Day for month {month}', fontsize=8)
+#     plt.xticks(range(0, 24))
+#     plt.show()
