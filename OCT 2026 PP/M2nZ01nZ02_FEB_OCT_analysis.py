@@ -199,29 +199,77 @@ panels = [
 
 #with the M2 and the z02 datasets, in the same 10 minitue intervals create a linear regression of the wind speed data 
 # at the heights of 50 m and 80 m (in their own subplots)
+# fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True,
+#                          constrained_layout=True)
+# axes = axes.ravel()
+# heights = [50, 80]
+# for ax, h in zip(axes, heights):
+#     # Align on timestamps (the two series have different lengths/time axes)
+#     m2_series = m2_10min[f'Avg Wind Speed @ {h}m [m/s]']
+#     da = ds_z02['wind_speed']
+#     da = da.sel(distance=h) if h in da['distance'].values else da.interp(distance=h)
+#     z02_series = pd.Series(da.to_numpy(), index=t_z02)
+#     paired = pd.concat([m2_series.rename('m2'), z02_series.rename('z02')],
+#                        axis=1, join='inner').replace([np.inf, -np.inf], np.nan).dropna()
+#     print(f"{h} m: {len(paired)} matched 10-min points")
+#     m2_data = paired['m2'].to_numpy()
+#     z02_data = paired['z02'].to_numpy()
+#     slope, intercept, r_value, p_value, std_err = linregress(m2_data, z02_data)
+#     ax.scatter(m2_data, z02_data, alpha=0.6, label='Data')
+#     x = np.linspace(m2_data.min(), m2_data.max(), 100)
+#     ax.plot(x, intercept + slope * x, 'r-', label=f'Fit: y={slope:.2f}x+{intercept:.2f}\nR²={r_value**2:.2f}')
+#     ax.set_title(f'{h} m', fontsize=11, loc='left')
+#     ax.set_xlabel('M2 wind speed (m/s)')
+#     ax.set_ylabel('Z02 wind speed (m/s)')
+#     ax.legend(fontsize=7, loc='upper left', frameon=False)
+#     ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+# plt.tight_layout()
+# plt.show()
+######################################################################
+
+# do the same linear regession analysis but for wind speed between Z01 and Z02 at the heights of 100 m and 200m 
+#also double-check that the time interval between the Z01 and Z02 datasets is consistent (10 minutes) 
+t_diff = np.diff(t_z01) / np.timedelta64(1, 'm')
+if not np.all(t_diff == 10):
+    print("Warning: Z01 time intervals are not consistent 10 minutes")
+t_diff = np.diff(t_z02) / np.timedelta64(1, 'm')
+if not np.all(t_diff == 10):
+    print("Warning: Z02 time intervals are not consistent 10 minutes")
+
+# Linear regression analysis for Z01 vs Z02 at 100 m and 200 m
 fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True,
                          constrained_layout=True)
 axes = axes.ravel()
-heights = [50, 80]
+heights = [100, 200]
 for ax, h in zip(axes, heights):
-    # Align on timestamps (the two series have different lengths/time axes)
-    m2_series = m2_10min[f'Avg Wind Speed @ {h}m [m/s]']
-    da = ds_z02['wind_speed']
-    da = da.sel(distance=h) if h in da['distance'].values else da.interp(distance=h)
-    z02_series = pd.Series(da.to_numpy(), index=t_z02)
-    paired = pd.concat([m2_series.rename('m2'), z02_series.rename('z02')],
-                       axis=1, join='inner').replace([np.inf, -np.inf], np.nan).dropna()
+    da_z01 = ds_z01['WS']
+    da_z01 = da_z01.sel(height=h) if h in da_z01['height'].values else da_z01.interp(height=h)
+    z01_series = pd.Series(da_z01.to_numpy(), index=t_z01)
+    da_z02 = ds_z02['wind_speed']
+    da_z02 = da_z02.sel(distance=h) if h in da_z02['distance'].values else da_z02.interp(distance=h)
+    z02_series = pd.Series(da_z02.to_numpy(), index=t_z02)
+    print(f"{h} m: valid Z01 = {z01_series.notna().sum()}, valid Z02 = {z02_series.notna().sum()}, "
+          f"exact common timestamps = {len(z01_series.index.intersection(z02_series.index))}")
+    # Pair each Z01 point with the nearest Z02 point within 5 min (handles small timestamp offsets)
+    z02_aligned = z02_series.dropna().sort_index().reindex(
+        z01_series.index, method='nearest', tolerance=pd.Timedelta(minutes=5))
+    paired = pd.concat([z01_series.rename('z01'), z02_aligned.rename('z02')],
+                       axis=1).replace([np.inf, -np.inf], np.nan).dropna()
     print(f"{h} m: {len(paired)} matched 10-min points")
-    m2_data = paired['m2'].to_numpy()
+    if paired.empty:
+        ax.set_title(f'{h} m: no overlapping valid data', fontsize=11, loc='left')
+        continue
+    z01_data = paired['z01'].to_numpy()
     z02_data = paired['z02'].to_numpy()
-    slope, intercept, r_value, p_value, std_err = linregress(m2_data, z02_data)
-    ax.scatter(m2_data, z02_data, alpha=0.6, label='Data')
-    x = np.linspace(m2_data.min(), m2_data.max(), 100)
+    slope, intercept, r_value, p_value, std_err = linregress(z01_data, z02_data)
+    ax.scatter(z01_data, z02_data, alpha=0.6, label='Data')
+    x = np.linspace(z01_data.min(), z01_data.max(), 100)
     ax.plot(x, intercept + slope * x, 'r-', label=f'Fit: y={slope:.2f}x+{intercept:.2f}\nR²={r_value**2:.2f}')
     ax.set_title(f'{h} m', fontsize=11, loc='left')
-    ax.set_xlabel('M2 wind speed (m/s)')
+    ax.set_xlabel('Z01 wind speed (m/s)')
     ax.set_ylabel('Z02 wind speed (m/s)')
     ax.legend(fontsize=7, loc='upper left', frameon=False)
     ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
 plt.tight_layout()
 plt.show()
+# fix later to see if I can resample the z01 data so that it aligns exactly with the Z02 timestamps or vice versa. 
