@@ -168,11 +168,28 @@ ds_m2_80m = ds_m2.loc[ds_m2[m2_80m_col] > 0, ['UTC_time', m2_80m_col]]  # NaN fa
 ################################################################
 # Make a frequency distribution histogram and fit a Weibull distribution 
 # #of wind speed at 50m for each month with the M2 and Z02 datasets
+#for the entire period (Feb to Oct 2026) 
 
 m2_all_50m = ds_m2_all.loc[ds_m2_all[m2_50m_col] > 0, ['UTC_time', m2_50m_col]]
 hist_months = sorted(set(pd.DatetimeIndex(common_time).month) | set(m2_all_50m['UTC_time'].dt.month))
 hist_months = sorted(set(pd.DatetimeIndex(common_time).month) | set(m2_all_50m['UTC_time'].dt.month))
 hist_months = [m for m in hist_months if 2 <= m <= 9]
+
+#creating the frequency histogram for the entire peiod (FEB-OCT 2026) between the
+wind_speed_all = m2_all_50m[m2_50m_col].dropna()
+wind_speed_all = wind_speed_all[wind_speed_all > 0]
+plt.figure(figsize=(10, 6))
+plt.hist(wind_speed_all, bins=20, density=True, alpha=0.6, color='g', label='M2 50m Wind Speed Frequency')
+params = stats.weibull_min.fit(wind_speed_all, floc=0)
+x = np.linspace(0, wind_speed_all.max(), 100)
+plt.plot(x, stats.weibull_min.pdf(x, *params), 'r-', lw=2, label='Weibull Fit')
+plt.title('M2 Wind Speed at 50m - Feb to Oct 2026')
+plt.xlabel('Wind Speed [m/s]')
+plt.ylabel('Frequency')
+plt.legend()
+plt.show()
+
+
 # for month in hist_months:
 #     z02_month = z02_50m_ws.sel(time=z02_50m_ws['time'].dt.month == month)
 #     # use the Z02-aligned M2 where Z02 exists; otherwise (October) use all M2 data
