@@ -83,24 +83,19 @@ for month in range(2, 11):
     n_flat = (wind_speed10[time.dt.month == month].notna() & wind_speed10_clean[time.dt.month == month].isna()).sum()
     print(f"Month {month}: removed {n_flat} flat wind speed samples")
 
-# create a month to month (Feb to Oct 2026) frequency hitogram with wibull fit line for wind speed at 10 m
-# for month in range(2, 11):
-#     wind_speed_month = wind_speed10_clean[time.dt.month == month].dropna()
-#     #Weibull needs positive values; calm (0 m/s) samples are excluded from the fit
-#     wind_speed_month = wind_speed_month[wind_speed_month > 0]
-#     if len(wind_speed_month) == 0:
-#         continue
-#     plt.figure(figsize=(10, 6))
-#     plt.hist(wind_speed_month, bins=20, density=True, alpha=0.6, color='b', label='Wind Speed Frequency')
-#     # Fit a Weibull distribution
-#     params = weibull_min.fit(wind_speed_month, floc=0)
-#     x = np.linspace(0, wind_speed_month.max(), 100)
-#     plt.plot(x, weibull_min.pdf(x, *params), 'r-', lw=2, label='Weibull Fit')
-#     plt.title(f'M2 Wind Speed at 10m - Month {month} , 2026')
-#     plt.xlabel('Wind Speed [m/s]')
-#     plt.ylabel('Frequency')
-#     plt.legend()
-#     plt.show()
+# create a frequency hitogram with wibull fit line for wind speed at 10 m for the entire period (Feb to Oct 2026)
+wind_speed_all = wind_speed10_clean[time.dt.month.isin(range(2, 11))].dropna()
+wind_speed_all = wind_speed_all[wind_speed_all > 0]
+plt.figure(figsize=(10, 6))
+plt.hist(wind_speed_all, bins=20, density=True, alpha=0.6, color='b', label='Wind Speed Frequency')
+params = weibull_min.fit(wind_speed_all, floc=0)
+x = np.linspace(0, wind_speed_all.max(), 100)
+plt.plot(x, weibull_min.pdf(x, *params), 'r-', lw=2, label='Weibull Fit')
+plt.title('M2 Wind Speed at 10m - Feb to Oct 2026')
+plt.xlabel('Wind Speed [m/s]')
+plt.ylabel('Frequency')
+plt.legend()
+plt.show()
 
 ################################################################
 #Wind rose plots for 50m and 80m 
@@ -122,21 +117,21 @@ RMAX = 20                         # fixed max radial frequency (%) shared by all
 #     plt.show()
 ################################
 #Wind rose for 80m month to month
-fig = plt.figure(figsize=(14, 14))
-gs = fig.add_gridspec(3, 3, wspace=0.3, hspace=0.3)
-for i, month in enumerate(range(2, 11)):
-    mask = (time.dt.month == month) & wind_dir80_clean.notna() & wind_speed80_clean.notna()
-    ax = WindroseAxes(fig, gs[i // 3, i % 3].get_position(fig))
-    fig.add_axes(ax)
-    ax.bar(wind_dir80_clean[mask], wind_speed80_clean[mask], normed=True, opening=0.8, edgecolor='white', bins=SPEED_BINS)
-    ax.set_ylim(0, RMAX)
-    ax.set_rgrids(np.linspace(0, RMAX, 5)[1:], labels=[f'{r:.0f}%' for r in np.linspace(0, RMAX, 5)[1:]])
-    ax.set_title(f'Month {month}')
-    if i == 0:
-        ax.set_legend(title='Wind Speed [m/s]', loc='best', bbox_to_anchor=(-0.3, 1.0))
-fig.suptitle('M2 Wind Rose at 80m - Monthly (Feb-Oct 2026, common scale)')
-plt.tight_layout()
-plt.show()
+# fig = plt.figure(figsize=(14, 14))
+# gs = fig.add_gridspec(3, 3, wspace=0.3, hspace=0.3)
+# for i, month in enumerate(range(2, 11)):
+#     mask = (time.dt.month == month) & wind_dir80_clean.notna() & wind_speed80_clean.notna()
+#     ax = WindroseAxes(fig, gs[i // 3, i % 3].get_position(fig))
+#     fig.add_axes(ax)
+#     ax.bar(wind_dir80_clean[mask], wind_speed80_clean[mask], normed=True, opening=0.8, edgecolor='white', bins=SPEED_BINS)
+#     ax.set_ylim(0, RMAX)
+#     ax.set_rgrids(np.linspace(0, RMAX, 5)[1:], labels=[f'{r:.0f}%' for r in np.linspace(0, RMAX, 5)[1:]])
+#     ax.set_title(f'Month {month}')
+#     if i == 0:
+#         ax.set_legend(title='Wind Speed [m/s]', loc='best', bbox_to_anchor=(-0.3, 1.0))
+# fig.suptitle('M2 Wind Rose at 80m - Monthly (Feb-Oct 2026, common scale)')
+# plt.tight_layout()
+# plt.show()
 
 #######################################
 # Finding Relevent Events from finding extreme events
