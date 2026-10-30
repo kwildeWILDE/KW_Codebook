@@ -174,17 +174,20 @@ def plot_weibull_histogram(data, ax, bins=30, color='blue', label=None, ls='-'):
             label=f'{label} Weibull (k={shape:.2f}, c={scale:.2f})')
 
 # Feb - Oct 2026, one subplot per height
-fig, axes = plt.subplots(3, 2, figsize=(12, 12))
+fig, axes = plt.subplots(3, 2, figsize=(12, 11), sharex=True, sharey=True,
+                         constrained_layout=True)
 axes = axes.ravel()
 for ax, (h, series) in zip(axes, panels):
     for label, data, color, ls in series:
         plot_weibull_histogram(data, ax, color=color, label=label, ls=ls)
-    ax.set_title(f'{h} m')
-    ax.set_xlabel('Wind speed (m/s)')
-    ax.set_ylabel('Frequency density')
-    ax.legend(fontsize=8)
+    ax.set_title(f'{h} m', fontsize=11, loc='left')
+    ax.legend(fontsize=7, loc='upper right', frameon=False)
+    ax.xaxis.set_major_locator(plt.MultipleLocator(2))
+    ax.tick_params(labelbottom=True)
 for ax in axes[len(panels):]:
     ax.set_visible(False)
+axes[-1].set_visible(False)
+fig.supxlabel('Wind speed (m/s)')
+fig.supylabel('Frequency density')
 fig.suptitle('Wind speed distributions, Feb - Oct 2026')
-fig.tight_layout()
 plt.show()
