@@ -132,6 +132,49 @@ m2_10min = (ds_m2.set_index('UTC_time')
                  .resample('10min', label='right', closed='right').mean())
 # print(m2_10min.head())
 
+#######################################################################
+# Align Z01, Z02 and M2 onto one common 10-minute grid
+# Z02 is already on 10-min stamps; Z01 is ~30-min with irregular stamps (e.g. 21:39:46),
+# so snap Z01 to the nearest 10 min (same right-edge convention as Z02/M2).
+def valid_heights(da, hdim, min_count=1):
+    counts = da.notnull().sum('time').to_series()
+    return counts[counts >= min_count]
+
+z01_valid = valid_heights(ds_z01['WS'], 'height')
+z02_valid = valid_heights(ds_z02['wind_speed'], 'distance')
+print("Z01 heights with wind speed data (height m: valid samples):")
+print(z01_valid.to_string())
+print("Z02 heights with wind speed data (height m: valid samples):")
+print(z02_valid.to_string())
+print("Z01 valid heights:", list(z01_valid.index.astype(int)))
+print("Z02 valid heights:", list(z02_valid.index.astype(int)))
+
+def snap_to_grid(ds, freq='10min'):
+    new_t = pd.DatetimeIndex(ds.get_index('time')).round(freq)
+    ds = ds.assign_coords(time=new_t)
+    return ds.isel(time=~ds.get_index('time').duplicated())
+
+ds_z01_g = snap_to_grid(ds_z01[['WS']])
+ds_z02_g = snap_to_grid(ds_z02[['wind_speed']])
+grid = pd.date_range(min(ds_z01_g.time.min().values, ds_z02_g.time.min().values),
+                     max(ds_z01_g.time.max().values, ds_z02_g.time.max().values),
+                     freq='10min').ceil('10min')
+ds_z01_g = ds_z01_g.reindex(time=grid)
+ds_z02_g = ds_z02_g.reindex(time=grid)
+m2_g = m2_10min.reindex(grid)
+
+for name, idx in [('Z01 (snapped)', ds_z01_g.get_index('time')), ('Z02', ds_z02_g.get_index('time')),
+                  ('M2 10-min', m2_10min.index)]:
+    print(f"{name}: minutes%10 all 0 = {bool(np.all(idx.minute % 10 == 0))}, "
+          f"seconds all 0 = {bool(np.all(idx.second == 0))}, "
+          f"interval counts = {dict(pd.Series(idx).diff().value_counts().head(3))}")
+z01_has = ds_z01_g['WS'].notnull().any('height').to_series()
+z02_has = ds_z02_g['wind_speed'].notnull().any('distance').to_series()
+m2_has = m2_g.notna().any(axis=1)
+print("Timestamps with data -> Z01:", z01_has.sum(), "Z02:", z02_has.sum(), "M2:", m2_has.sum())
+print("Z01 & Z02:", (z01_has & z02_has).sum(), "| M2 & Z02:", (m2_has & z02_has).sum(),
+      "| M2 & Z01:", (m2_has & z01_has).sum(), "| all three:", (m2_has & z01_has & z02_has).sum())
+
 #####################################################################################################
 #create a frequency histogram with a weibull fit line for wind speed for
 ## 10m wind speed from the M2 dataset (blue histogram, with red Weibull fit line)
@@ -231,7 +274,7 @@ panels = [
 #also double-check that the time interval between the Z01 and Z02 datasets is consistent (10 minutes) 
 t_diff = np.diff(t_z01) / np.timedelta64(1, 'm')
 if not np.all(t_diff == 10):
-    print("Warning: Z01 time intervals are not consistent 10 minutes")
+    print("Warning: Z01 raw time intervals are not a consistent 10 minutes (~30 min, irregular); snapped to the 10-min grid above")
 t_diff = np.diff(t_z02) / np.timedelta64(1, 'm')
 if not np.all(t_diff == 10):
     print("Warning: Z02 time intervals are not consistent 10 minutes")
@@ -240,20 +283,14 @@ if not np.all(t_diff == 10):
 fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True,
                          constrained_layout=True)
 axes = axes.ravel()
-heights = [100, 200]
+# Z01 has no valid data at 100 m (lowest valid gate is 120 m), so 120 m replaces 100 m.
+heights = [120, 200]
 for ax, h in zip(axes, heights):
-    da_z01 = ds_z01['WS']
-    da_z01 = da_z01.sel(height=h) if h in da_z01['height'].values else da_z01.interp(height=h)
-    z01_series = pd.Series(da_z01.to_numpy(), index=t_z01)
-    da_z02 = ds_z02['wind_speed']
-    da_z02 = da_z02.sel(distance=h) if h in da_z02['distance'].values else da_z02.interp(distance=h)
-    z02_series = pd.Series(da_z02.to_numpy(), index=t_z02)
-    print(f"{h} m: valid Z01 = {z01_series.notna().sum()}, valid Z02 = {z02_series.notna().sum()}, "
-          f"exact common timestamps = {len(z01_series.index.intersection(z02_series.index))}")
-    # Pair each Z01 point with the nearest Z02 point within 5 min (handles small timestamp offsets)
-    z02_aligned = z02_series.dropna().sort_index().reindex(
-        z01_series.index, method='nearest', tolerance=pd.Timedelta(minutes=5))
-    paired = pd.concat([z01_series.rename('z01'), z02_aligned.rename('z02')],
+    # Both datasets are now on the same exact 10-min grid, so pair by exact timestamp
+    z01_series = ds_z01_g['WS'].sel(height=h).to_series()
+    z02_series = ds_z02_g['wind_speed'].sel(distance=h).to_series()
+    print(f"{h} m: valid Z01 = {z01_series.notna().sum()}, valid Z02 = {z02_series.notna().sum()}")
+    paired = pd.concat([z01_series.rename('z01'), z02_series.rename('z02')],
                        axis=1).replace([np.inf, -np.inf], np.nan).dropna()
     print(f"{h} m: {len(paired)} matched 10-min points")
     if paired.empty:
@@ -272,4 +309,5 @@ for ax, h in zip(axes, heights):
     ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
 plt.tight_layout()
 plt.show()
-# fix later to see if I can resample the z01 data so that it aligns exactly with the Z02 timestamps or vice versa. 
+##########################################
+
