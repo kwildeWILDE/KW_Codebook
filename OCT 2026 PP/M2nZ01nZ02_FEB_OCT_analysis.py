@@ -11,6 +11,7 @@ import os
 import re
 import scipy.stats as stats
 from scipy.stats import weibull_min, norm, gaussian_kde
+from scipy.stats import linregress
 
 #######################################################################
 # Importing the M2 dataset #
@@ -164,30 +165,63 @@ panels = [
     (500, [('Z01', z01_ws(500), 'purple', '-')]),
 ]
 
-def plot_weibull_histogram(data, ax, bins=30, color='blue', label=None, ls='-'):
-    data = data[np.isfinite(data)]
-    data = data[data > 0]  # Weibull with floc=0 needs positive values
-    shape, loc, scale = weibull_min.fit(data, floc=0)
-    ax.hist(data, bins=bins, density=True, alpha=0.6, color=color, label=f'{label} data')
-    x = np.linspace(0, data.max(), 200)
-    ax.plot(x, weibull_min.pdf(x, shape, loc, scale), color='red', ls=ls, lw=2,
-            label=f'{label} Weibull (k={shape:.2f}, c={scale:.2f})')
+# def plot_weibull_histogram(data, ax, bins=30, color='blue', label=None, ls='-'):
+#     data = data[np.isfinite(data)]
+#     data = data[data > 0]  # Weibull with floc=0 needs positive values
+#     shape, loc, scale = weibull_min.fit(data, floc=0)
+#     ax.hist(data, bins=bins, density=True, alpha=0.6, color=color, label=f'{label} data')
+#     x = np.linspace(0, data.max(), 200)
+#     ax.plot(x, weibull_min.pdf(x, shape, loc, scale), color='red', ls=ls, lw=2,
+#             label=f'{label} Weibull (k={shape:.2f}, c={scale:.2f})')
 
-# Feb - Oct 2026, one subplot per height
-fig, axes = plt.subplots(3, 2, figsize=(12, 11), sharex=True, sharey=True,
+# # Feb - Oct 2026, one subplot per height
+# fig, axes = plt.subplots(3, 2, figsize=(12, 11), sharex=True, sharey=True,
+#                          constrained_layout=True)
+# axes = axes.ravel()
+# for ax, (h, series) in zip(axes, panels):
+#     for label, data, color, ls in series:
+#         plot_weibull_histogram(data, ax, color=color, label=label, ls=ls)
+#     ax.set_title(f'{h} m', fontsize=11, loc='left')
+#     ax.legend(fontsize=7, loc='upper right', frameon=False)
+#     ax.xaxis.set_major_locator(plt.MultipleLocator(2))
+#     ax.tick_params(labelbottom=True)
+# for ax in axes[len(panels):]:
+#     ax.set_visible(False)
+# axes[-1].set_visible(False)
+# fig.supxlabel('Wind speed (m/s)')
+# fig.supylabel('Frequency density')
+# fig.suptitle('Wind speed distributions, Feb - Oct 2026')
+# for ax in axes:
+#     ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+# plt.tight_layout()
+# plt.show()
+################################################################################## 
+
+#with the M2 and the z02 datasets, in the same 10 minitue intervals create a linear regression of the wind speed data 
+# at the heights of 50 m and 80 m (in their own subplots)
+fig, axes = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True,
                          constrained_layout=True)
 axes = axes.ravel()
-for ax, (h, series) in zip(axes, panels):
-    for label, data, color, ls in series:
-        plot_weibull_histogram(data, ax, color=color, label=label, ls=ls)
+heights = [50, 80]
+for ax, h in zip(axes, heights):
+    # Align on timestamps (the two series have different lengths/time axes)
+    m2_series = m2_10min[f'Avg Wind Speed @ {h}m [m/s]']
+    da = ds_z02['wind_speed']
+    da = da.sel(distance=h) if h in da['distance'].values else da.interp(distance=h)
+    z02_series = pd.Series(da.to_numpy(), index=t_z02)
+    paired = pd.concat([m2_series.rename('m2'), z02_series.rename('z02')],
+                       axis=1, join='inner').replace([np.inf, -np.inf], np.nan).dropna()
+    print(f"{h} m: {len(paired)} matched 10-min points")
+    m2_data = paired['m2'].to_numpy()
+    z02_data = paired['z02'].to_numpy()
+    slope, intercept, r_value, p_value, std_err = linregress(m2_data, z02_data)
+    ax.scatter(m2_data, z02_data, alpha=0.6, label='Data')
+    x = np.linspace(m2_data.min(), m2_data.max(), 100)
+    ax.plot(x, intercept + slope * x, 'r-', label=f'Fit: y={slope:.2f}x+{intercept:.2f}\nR²={r_value**2:.2f}')
     ax.set_title(f'{h} m', fontsize=11, loc='left')
-    ax.legend(fontsize=7, loc='upper right', frameon=False)
-    ax.xaxis.set_major_locator(plt.MultipleLocator(2))
-    ax.tick_params(labelbottom=True)
-for ax in axes[len(panels):]:
-    ax.set_visible(False)
-axes[-1].set_visible(False)
-fig.supxlabel('Wind speed (m/s)')
-fig.supylabel('Frequency density')
-fig.suptitle('Wind speed distributions, Feb - Oct 2026')
+    ax.set_xlabel('M2 wind speed (m/s)')
+    ax.set_ylabel('Z02 wind speed (m/s)')
+    ax.legend(fontsize=7, loc='upper left', frameon=False)
+    ax.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.7)
+plt.tight_layout()
 plt.show()
