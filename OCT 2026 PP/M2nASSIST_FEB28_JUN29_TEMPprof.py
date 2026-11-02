@@ -164,23 +164,23 @@ def match_on_utc(m2_series, at_series):
     return merged.dropna()
 
 # create subplots for each height pairs for the linear regression 
-# fig, axes = plt.subplots(len(plot_pairs), 1, figsize=(8, 5 * len(plot_pairs)), squeeze=False)
-# for ax, (m2_height, at_height) in zip(axes.ravel(), plot_pairs):
-#     matched = match_on_utc(m2_temp_by_height[m2_height], at_temp_by_height[at_height])
-#     x, y = matched['m2'].values, matched['at'].values
-#     ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
-#     if x.size > 1:
-#         slope, intercept, r, p, se = stats.linregress(x, y)
-#         xs = np.linspace(x.min(), x.max(), 200)
-#         ax.plot(xs, slope * xs + intercept, color='red', lw=2,
-#                 label=f'y = {slope:.2f}x + {intercept:.2f}\n$R^2$ = {r**2:.3f}, n = {x.size}')
-#         ax.legend(loc='upper left')
-#     ax.set_xlabel(f'M2 Temperature at {m2_height}m [deg C]')
-#     ax.set_ylabel(f'ASSIST Temperature at {at_height}m [deg C]')
-#     ax.set_title(f'M2 {m2_height}m vs ASSIST {at_height}m (UTC-matched)')
-#     ax.grid(True, alpha=0.2, ls='--')
-# plt.tight_layout()
-# plt.show()
+fig, axes = plt.subplots(len(plot_pairs), 1, figsize=(8, 5 * len(plot_pairs)), squeeze=False)
+for ax, (m2_height, at_height) in zip(axes.ravel(), plot_pairs):
+    matched = match_on_utc(m2_temp_by_height[m2_height], at_temp_by_height[at_height])
+    x, y = matched['m2'].values, matched['at'].values
+    ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
+    if x.size > 1:
+        slope, intercept, r, p, se = stats.linregress(x, y)
+        xs = np.linspace(x.min(), x.max(), 200)
+        ax.plot(xs, slope * xs + intercept, color='red', lw=2,
+                label=f'y = {slope:.2f}x + {intercept:.2f}\n$R^2$ = {r**2:.3f}, n = {x.size}')
+        ax.legend(loc='upper left')
+    ax.set_xlabel(f'M2 Temperature at {m2_height}m [deg C]')
+    ax.set_ylabel(f'ASSIST Temperature at {at_height}m [deg C]')
+    ax.set_title(f'M2 {m2_height}m vs ASSIST {at_height}m (UTC-matched)')
+    ax.grid(True, alpha=0.2, ls='--')
+plt.tight_layout()
+plt.show()
 
 ####################################################################################
 #Now that we have the filtered M2 and ASSIST datasets, 
@@ -223,47 +223,47 @@ at_temp_0_100m = at_temp_0_100m.load()
 at_months = at_temp_0_100m['time'].dt.month.values
 m2_months = ds_m2_filtered['UTC_time'].dt.month
 
-for month in months:
-    #filter the ASSIST and M2 datasets for the current month
-    print(f"Processing month: {month}")
-    at_temp_0_100m_month = at_temp_0_100m.isel(time=np.where(at_months == month)[0])
-    m2_month = ds_m2_filtered[m2_months == month]
-    m2_temp_2m_month = m2_month.set_index('UTC_time')["Temperature @ 2m [deg C]"]
-    m2_temp_50m_month = m2_month.set_index('UTC_time')["Temperature @ 50m [deg C]"]
-    # print(f"ASSIST data points for month {month}: {len(at_temp_0_200m_month['time'])}")
-    # print(f"M2 2m data points for month {month}: {len(m2_temp_2m_month['time'])}")
-    # print(f"M2 50m data points for month {month}: {len(m2_temp_50m_month['time'])}")
-    # print(f"M2 80m data points for month {month}: {len(m2_temp_80m_month['time'])}")
-    #create the figure and axis
-    fig, ax = plt.subplots(figsize=(12, 6))
+# for month in months:
+#     #filter the ASSIST and M2 datasets for the current month
+#     print(f"Processing month: {month}")
+#     at_temp_0_100m_month = at_temp_0_100m.isel(time=np.where(at_months == month)[0])
+#     m2_month = ds_m2_filtered[m2_months == month]
+#     m2_temp_2m_month = m2_month.set_index('UTC_time')["Temperature @ 2m [deg C]"]
+#     m2_temp_50m_month = m2_month.set_index('UTC_time')["Temperature @ 50m [deg C]"]
+#     # print(f"ASSIST data points for month {month}: {len(at_temp_0_200m_month['time'])}")
+#     # print(f"M2 2m data points for month {month}: {len(m2_temp_2m_month['time'])}")
+#     # print(f"M2 50m data points for month {month}: {len(m2_temp_50m_month['time'])}")
+#     # print(f"M2 80m data points for month {month}: {len(m2_temp_80m_month['time'])}")
+#     #create the figure and axis
+#     fig, ax = plt.subplots(figsize=(12, 6))
 
-    #plot the ASSIST temperature profile as a heat map
-    #the M2 points are drawn on the same axis at their measurement heights and colored with the
-    #same colormap and limits as the heat map, so equal colors mean equal temperatures
-    #only keep valid M2 measurements
-    m2_2m_valid = m2_temp_2m_month[m2_temp_2m_month > -20]
-    m2_50m_valid = m2_temp_50m_month[m2_temp_50m_month > -20]
-    vmin = np.nanmin([float(at_temp_0_100m_month.min()), m2_2m_valid.min(), m2_50m_valid.min()])
-    vmax = np.nanmax([float(at_temp_0_100m_month.max()), m2_2m_valid.max(), m2_50m_valid.max()])
+#     #plot the ASSIST temperature profile as a heat map
+#     #the M2 points are drawn on the same axis at their measurement heights and colored with the
+#     #same colormap and limits as the heat map, so equal colors mean equal temperatures
+#     #only keep valid M2 measurements
+#     m2_2m_valid = m2_temp_2m_month[m2_temp_2m_month > -20]
+#     m2_50m_valid = m2_temp_50m_month[m2_temp_50m_month > -20]
+#     vmin = np.nanmin([float(at_temp_0_100m_month.min()), m2_2m_valid.min(), m2_50m_valid.min()])
+#     vmax = np.nanmax([float(at_temp_0_100m_month.max()), m2_2m_valid.max(), m2_50m_valid.max()])
 
-    pcm = ax.pcolormesh(at_temp_0_100m_month['time'], at_temp_0_100m_month['height'] * 1000, at_temp_0_100m_month.T,
-                        shading='auto', cmap='viridis', vmin=vmin, vmax=vmax)
-    fig.colorbar(pcm, ax=ax, label='Temperature [deg C] (ASSIST heat map and M2 points)')
+#     pcm = ax.pcolormesh(at_temp_0_100m_month['time'], at_temp_0_100m_month['height'] * 1000, at_temp_0_100m_month.T,
+#                         shading='auto', cmap='viridis', vmin=vmin, vmax=vmax)
+#     fig.colorbar(pcm, ax=ax, label='Temperature [deg C] (ASSIST heat map and M2 points)')
 
-    for m2_h, m2_valid in [(2, m2_2m_valid), (50, m2_50m_valid)]:
-        ax.scatter(m2_valid.index, np.full(len(m2_valid), m2_h), c=m2_valid.values, cmap='viridis',
-                   vmin=vmin, vmax=vmax, s=20, edgecolors='k', linewidths=0.2, zorder=3)
-        ax.axhline(m2_h, color='k', lw=0.4, ls=':', alpha=0.6)
-        ax.annotate(f'M2 {m2_h}m', xy=(1.0, m2_h), xycoords=('axes fraction', 'data'),
-                    xytext=(-4, 3), textcoords='offset points', ha='right', fontsize=8,
-                    bbox=dict(facecolor='white', alpha=0.7, pad=1))
+#     for m2_h, m2_valid in [(2, m2_2m_valid), (50, m2_50m_valid)]:
+#         ax.scatter(m2_valid.index, np.full(len(m2_valid), m2_h), c=m2_valid.values, cmap='viridis',
+#                    vmin=vmin, vmax=vmax, s=20, edgecolors='k', linewidths=0.2, zorder=3)
+#         ax.axhline(m2_h, color='k', lw=0.4, ls=':', alpha=0.6)
+#         ax.annotate(f'M2 {m2_h}m', xy=(1.0, m2_h), xycoords=('axes fraction', 'data'),
+#                     xytext=(-4, 3), textcoords='offset points', ha='right', fontsize=8,
+#                     bbox=dict(facecolor='white', alpha=0.7, pad=1))
 
-    ax.set_ylim(0, 100)
-    ax.set_xlabel('Time (UTC)')
-    ax.set_ylabel('Height [m]')
-    plt.title(f'ASSIST Temperature over Height with Superimposed M2 Points for month {month}, 2026')
-    plt.tight_layout()
-    plt.show()
+#     ax.set_ylim(0, 100)
+#     ax.set_xlabel('Time (UTC)')
+#     ax.set_ylabel('Height [m]')
+#     plt.title(f'ASSIST Temperature over Height with Superimposed M2 Points for month {month}, 2026')
+#     plt.tight_layout()
+#     plt.show()
 
 # Note: The 80m M2 temperature data has been poorly recored there and is therefore not included in the plots.#### 
 #Have not saved the plots with the max height of 100m 
