@@ -149,8 +149,9 @@ skipped = [p for p in height_pairs if p not in plot_pairs]
 if skipped:
     print(f"Skipping height pairs with no data loaded (M2 m, ASSIST m): {skipped}")
 
-# Match the datasets on UTC time. ASSIST and M2 sampling differ, so each ASSIST sample is
-# paired with the nearest M2 sample within a tolerance (rows without a match are dropped).
+# Match the datasets on UTC time. M2 is linearly interpolated in time onto each ASSIST timestamp,
+# using the M2 samples on either side. A point is dropped if either neighbouring M2 sample is
+# more than MATCH_TOLERANCE away, so the interpolation never bridges a data gap.
 MATCH_TOLERANCE = pd.Timedelta(minutes=5)
 
 def match_on_utc(m2_series, at_series):
@@ -160,29 +161,35 @@ def match_on_utc(m2_series, at_series):
     at_df = (pd.DataFrame({'UTC_time': pd.to_datetime(at_vals['time'].values), 'at': at_vals.values})
              .dropna().drop_duplicates(subset='UTC_time').sort_values('UTC_time'))
     #the two time columns can have different datetime units (ns vs us), so cast both to ns
-    m2_df['UTC_time'] = m2_df['UTC_time'].astype('datetime64[ns]')
-    at_df['UTC_time'] = at_df['UTC_time'].astype('datetime64[ns]')
-    merged = pd.merge_asof(at_df, m2_df, on='UTC_time', direction='nearest', tolerance=MATCH_TOLERANCE)
-    return merged.dropna()
-
+    m2_t = m2_df['UTC_time'].astype('datetime64[ns]').to_numpy().astype('int64')
+    at_t = at_df['UTC_time'].astype('datetime64[ns]').to_numpy().astype('int64')
+    tol = MATCH_TOLERANCE.value
+    idx = np.searchsorted(m2_t, at_t)
+    ok = (idx > 0) & (idx < m2_t.size)
+    lo, hi = np.clip(idx - 1, 0, m2_t.size - 1), np.clip(idx, 0, m2_t.size - 1)
+    ok &= ((at_t - m2_t[lo]) <= tol) & ((m2_t[hi] - at_t) <= tol)
+    out = at_df.loc[ok].copy()
+    out['UTC_time'] = out['UTC_time'].astype('datetime64[ns]')
+    out['m2'] = np.interp(at_t[ok], m2_t, m2_df['m2'].to_numpy())
+    return out.dropna()
 # create subplots for each height pairs for the linear regression 
-# fig, axes = plt.subplots(len(plot_pairs), 1, figsize=(8, 5 * len(plot_pairs)), squeeze=False)
-# for ax, (m2_height, at_height) in zip(axes.ravel(), plot_pairs):
-#     matched = match_on_utc(m2_temp_by_height[m2_height], at_temp_by_height[at_height])
-#     x, y = matched['m2'].values, matched['at'].values
-#     ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
-#     if x.size > 1:
-#         slope, intercept, r, p, se = stats.linregress(x, y)
-#         xs = np.linspace(x.min(), x.max(), 200)
-#         ax.plot(xs, slope * xs + intercept, color='red', lw=2,
-#                 label=f'y = {slope:.2f}x + {intercept:.2f}\n$R^2$ = {r**2:.3f}, n = {x.size}')
-#         ax.legend(loc='upper left')
-#     ax.set_xlabel(f'M2 Temperature at {m2_height}m [deg C]')
-#     ax.set_ylabel(f'ASSIST Temperature at {at_height}m [deg C]')
-#     ax.set_title(f'M2 {m2_height}m vs ASSIST {at_height}m (UTC-matched)')
-#     ax.grid(True, alpha=0.2, ls='--')
-# plt.tight_layout()
-# plt.show()
+fig, axes = plt.subplots(len(plot_pairs), 1, figsize=(8, 5 * len(plot_pairs)), squeeze=False)
+for ax, (m2_height, at_height) in zip(axes.ravel(), plot_pairs):
+    matched = match_on_utc(m2_temp_by_height[m2_height], at_temp_by_height[at_height])
+    x, y = matched['m2'].values, matched['at'].values
+    ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
+    if x.size > 1:
+        slope, intercept, r, p, se = stats.linregress(x, y)
+        xs = np.linspace(x.min(), x.max(), 200)
+        ax.plot(xs, slope * xs + intercept, color='red', lw=2,
+                label=f'y = {slope:.2f}x + {intercept:.2f}\n$R^2$ = {r**2:.3f}, n = {x.size}')
+        ax.legend(loc='upper left')
+    ax.set_xlabel(f'M2 Temperature at {m2_height}m [deg C]')
+    ax.set_ylabel(f'ASSIST Temperature interpolated to {at_height}m [deg C]')
+    ax.set_title(f'M2 vs ASSIST at {m2_height}m (both linearly interpolated: ASSIST in height, M2 in time)')
+    ax.grid(True, alpha=0.2, ls='--')
+plt.tight_layout()
+plt.show()
 
 ####################################################################################
 #Now that we have the filtered M2 and ASSIST datasets, 
@@ -295,52 +302,52 @@ at_heights_m = at_temp_0_100m['height'].values * 1000
 
 #hourly-mean ASSIST profile for every month: (hour, height)
 at_diurnal = {}
-for month in months:
-    sel = at_local_months == month
-    profile = np.full((24, at_heights_m.size), np.nan)
-    for hr in range(24):
-        hr_sel = sel & (at_hours == hr)
-        if hr_sel.any():
-            profile[hr] = np.nanmean(at_temp_0_100m.values[hr_sel], axis=0)
-    at_diurnal[month] = profile
+# for month in months:
+#     sel = at_local_months == month
+#     profile = np.full((24, at_heights_m.size), np.nan)
+#     for hr in range(24):
+#         hr_sel = sel & (at_hours == hr)
+#         if hr_sel.any():
+#             profile[hr] = np.nanmean(at_temp_0_100m.values[hr_sel], axis=0)
+#     at_diurnal[month] = profile
 
-#one shared color scale so the months and the M2 points are directly comparable
-vmin = np.nanmin([np.nanmin(p) for p in at_diurnal.values()] + [m2_diurnal[[2, 50]].min().min()])
-vmax = np.nanmax([np.nanmax(p) for p in at_diurnal.values()] + [m2_diurnal[[2, 50]].max().max()])
-levels = np.linspace(vmin, vmax, 21)
+# #one shared color scale so the months and the M2 points are directly comparable
+# vmin = np.nanmin([np.nanmin(p) for p in at_diurnal.values()] + [m2_diurnal[[2, 50]].min().min()])
+# vmax = np.nanmax([np.nanmax(p) for p in at_diurnal.values()] + [m2_diurnal[[2, 50]].max().max()])
+# levels = np.linspace(vmin, vmax, 21)
 
-fig, axes = plt.subplots(1, len(months), figsize=(4 * len(months), 4.5), sharey=True, constrained_layout=True)
-hours = np.arange(24)
-for ax, month in zip(axes, months):
-    cf = ax.contourf(hours, at_heights_m, at_diurnal[month].T, levels=levels, cmap='RdYlBu_r', extend='both')
-    ax.contour(hours, at_heights_m, at_diurnal[month].T, levels=levels[::4], colors='k', linewidths=0.5)
+# fig, axes = plt.subplots(1, len(months), figsize=(4 * len(months), 4.5), sharey=True, constrained_layout=True)
+# hours = np.arange(24)
+# for ax, month in zip(axes, months):
+#     cf = ax.contourf(hours, at_heights_m, at_diurnal[month].T, levels=levels, cmap='RdYlBu_r', extend='both')
+#     ax.contour(hours, at_heights_m, at_diurnal[month].T, levels=levels[::4], colors='k', linewidths=0.5)
 
-    #M2 diurnal mean at the sensor heights, drawn with the same colormap so matching colors = agreement
-    for m2_h in (2, 50):
-        if month in m2_diurnal.index.get_level_values('month'):
-            m2_m = m2_diurnal.loc[month][m2_h].dropna()
-            ax.scatter(m2_m.index, np.full(len(m2_m), m2_h), c=m2_m.values, cmap='RdYlBu_r',
-                       vmin=vmin, vmax=vmax, s=45, edgecolors=height_colors[m2_h], linewidths=1.2, zorder=3)
-        ax.axhline(m2_h, color=height_colors[m2_h], lw=0.6, ls=':')
+#     #M2 diurnal mean at the sensor heights, drawn with the same colormap so matching colors = agreement
+#     for m2_h in (2, 50):
+#         if month in m2_diurnal.index.get_level_values('month'):
+#             m2_m = m2_diurnal.loc[month][m2_h].dropna()
+#             ax.scatter(m2_m.index, np.full(len(m2_m), m2_h), c=m2_m.values, cmap='RdYlBu_r',
+#                        vmin=vmin, vmax=vmax, s=45, edgecolors=height_colors[m2_h], linewidths=1.2, zorder=3)
+#         ax.axhline(m2_h, color=height_colors[m2_h], lw=0.6, ls=':')
 
-    ax.set_title(month_names[month])
-    ax.set_xlim(0, 23)
-    ax.set_ylim(0, 100)
-    ax.set_xticks([0, 6, 12, 18])
-    ax.set_xlabel('Time (MST)')
-    ax.grid(True, alpha=0.2, ls='--')
-axes[0].set_ylabel('Height [m]')
-fig.colorbar(cf, ax=axes, label='Temperature [deg C]')
-fig.text(0.5, 0.01, 'M2 circles: cyan outline = 2 m, tomato outline = 50 m', ha='center', fontsize=9)
-fig.suptitle('Diurnal mean temperature: ASSIST profile with M2 at 2 m and 50 m')
-plt.show()
+#     ax.set_title(month_names[month])
+#     ax.set_xlim(0, 23)
+#     ax.set_ylim(0, 100)
+#     ax.set_xticks([0, 6, 12, 18])
+#     ax.set_xlabel('Time (MST)')
+#     ax.grid(True, alpha=0.2, ls='--')
+# axes[0].set_ylabel('Height [m]')
+# fig.colorbar(cf, ax=axes, label='Temperature [deg C]')
+# fig.text(0.5, 0.01, 'M2 circles: cyan outline = 2 m, tomato outline = 50 m', ha='center', fontsize=9)
+# fig.suptitle('Diurnal mean temperature: ASSIST profile with M2 at 2 m and 50 m')
+# plt.show()
 
-#numeric agreement (ASSIST nearest level minus M2) per month, averaged over the diurnal cycle
-for month in months:
-    for m2_h, at_h in [(2, 0), (50, 46)]:
-        k = np.argmin(np.abs(at_heights_m - at_h))
-        if month in m2_diurnal.index.get_level_values('month'):
-            m2_m = m2_diurnal.loc[month][m2_h].reindex(hours).values
-            diff = at_diurnal[month][:, k] - m2_m
-            print(f"{month_names[month]} M2 {m2_h}m vs ASSIST {at_h}m: mean bias {np.nanmean(diff):.2f} C, RMSE {np.sqrt(np.nanmean(diff**2)):.2f} C")
+# #numeric agreement (ASSIST nearest level minus M2) per month, averaged over the diurnal cycle
+# for month in months:
+#     for m2_h, at_h in [(2, 0), (50, 46)]:
+#         k = np.argmin(np.abs(at_heights_m - at_h))
+#         if month in m2_diurnal.index.get_level_values('month'):
+#             m2_m = m2_diurnal.loc[month][m2_h].reindex(hours).values
+#             diff = at_diurnal[month][:, k] - m2_m
+#             print(f"{month_names[month]} M2 {m2_h}m vs ASSIST {at_h}m: mean bias {np.nanmean(diff):.2f} C, RMSE {np.sqrt(np.nanmean(diff**2)):.2f} C")
 ### Get back to fix later after getting feedback on the current plot. 

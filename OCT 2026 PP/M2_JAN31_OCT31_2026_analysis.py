@@ -1,4 +1,4 @@
-#import necessary libraries
+﻿#import necessary libraries
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -17,7 +17,7 @@ from windrose import WindroseAxes
 #Pull the Full M2 data from Jan 31 to Oct 17, 2026 
 
 dp_m2 = "C:/Users/kwilde/OneDrive - NLR/Documents"
-file_path_m2 = f"{dp_m2}/M2_FULL_JAN31_OCT31_2026_Datapull.xlsx"
+file_path_m2 = f"{dp_m2}/M2_HOUR_JAN31_OCT17_Datapull.xlsx"
 
 #read the file 
 #read_excel is slow, so cache it as a pickle and reuse it until the Excel file changes
@@ -30,8 +30,8 @@ else:
 
 print(ds_m2.head())
 
-#Convert MST into an apporite data format for plotting
-ds_m2['datetime'] = pd.to_datetime(ds_m2['DATE (MM/DD/YYYY)'].astype(str) + ' ' + ds_m2['MST'].astype(str))
+#Convert MST into an apporite data format for plotting (HOUR-MST is an integer hour, so add it as a timedelta to the date)
+ds_m2['datetime'] = pd.to_datetime(ds_m2['DATE (MM/DD/YYYY)'].astype(str)) + pd.to_timedelta(ds_m2['HOUR-MST'], unit='h')
 #the FULL datapull rows are not in time order; sort so time series and flat-run detection are valid
 ds_m2 = ds_m2.sort_values('datetime').reset_index(drop=True)
 time = ds_m2['datetime']
@@ -44,26 +44,26 @@ ds_m2 = ds_m2.replace(-99999, np.nan)
 # ^^^^^ New ds to use that skips the -99999 values
 
 #vairbles for temperature at different heights
-temp2 = ds_m2['Temperature @ 2m [deg C]']
-temp50 = ds_m2['Temperature @ 50m [deg C]']
-temp80 = ds_m2['Temperature @ 80m [deg C]']
+temp2 = ds_m2['Avg Temperature @ 2m [deg C]']
+temp50 = ds_m2['Avg Temperature @ 50m [deg C]']
+temp80 = ds_m2['Avg Temperature @ 80m [deg C]']
 
 #varibles for wind speed at different heights
-wind_speed2 = ds_m2['Avg Wind Speed @ 2m [m/s]']
-wind_speed5 = ds_m2['Avg Wind Speed @ 5m [m/s]']
-wind_speed10 = ds_m2['Avg Wind Speed @ 10m [m/s]']
-wind_speed20 = ds_m2['Avg Wind Speed @ 20m [m/s]']
-wind_speed50 = ds_m2['Avg Wind Speed @ 50m [m/s]']
-wind_speed80 = ds_m2['Avg Wind Speed @ 80m [m/s]']
+wind_speed2 = ds_m2['Avg Avg Wind Speed @ 2m [m/s]']
+wind_speed5 = ds_m2['Avg Avg Wind Speed @ 5m [m/s]']
+wind_speed10 = ds_m2['Avg Avg Wind Speed @ 10m [m/s]']
+wind_speed20 = ds_m2['Avg Avg Wind Speed @ 20m [m/s]']
+wind_speed50 = ds_m2['Avg Avg Wind Speed @ 50m [m/s]']
+wind_speed80 = ds_m2['Avg Avg Wind Speed @ 80m [m/s]']
 
 
-# variables for wind direction at different heights
-wind_dir2 = ds_m2['Avg Wind Direction @ 2m [deg]']
-wind_dir5 = ds_m2['Avg Wind Direction @ 5m [deg]']
-wind_dir10 = ds_m2['Avg Wind Direction @ 10m [deg]']
-wind_dir20 = ds_m2['Avg Wind Direction @ 20m [deg]']
-wind_dir50 = ds_m2['Avg Wind Direction @ 50m [deg]']
-wind_dir80 = ds_m2['Avg Wind Direction @ 80m [deg]']
+# # variables for wind direction at different heights
+# wind_dir2 = pd.Series(np.nan, index=ds_m2.index)  #hourly datapull has no wind direction columns
+# wind_dir5 = pd.Series(np.nan, index=ds_m2.index)  #hourly datapull has no wind direction columns
+# wind_dir10 = pd.Series(np.nan, index=ds_m2.index)  #hourly datapull has no wind direction columns
+# wind_dir20 = pd.Series(np.nan, index=ds_m2.index)  #hourly datapull has no wind direction columns
+# wind_dir50 = pd.Series(np.nan, index=ds_m2.index)  #hourly datapull has no wind direction columns
+# wind_dir80 = pd.Series(np.nan, index=ds_m2.index)  #hourly datapull has no wind direction columns
 
 #Flat (stuck-sensor) values: a run of identical consecutive readings is not real wind variability.
 #Find runs on the full series (so runs crossing a month boundary are caught) and mask them as NaN.
@@ -77,8 +77,8 @@ def mask_flat_runs(series, min_run=MIN_FLAT_RUN):
 wind_speed10_clean = mask_flat_runs(wind_speed10)
 wind_speed50_clean = mask_flat_runs(wind_speed50)
 wind_speed80_clean = mask_flat_runs(wind_speed80)
-wind_dir50_clean = mask_flat_runs(wind_dir50)  # stuck direction readings (e.g. repeated 0 deg)
-wind_dir80_clean = mask_flat_runs(wind_dir80)
+# wind_dir50_clean = mask_flat_runs(wind_dir50)  # stuck direction readings (e.g. repeated 0 deg)
+# wind_dir80_clean = mask_flat_runs(wind_dir80)
 for month in range(2, 11):
     n_flat = (wind_speed10[time.dt.month == month].notna() & wind_speed10_clean[time.dt.month == month].isna()).sum()
     print(f"Month {month}: removed {n_flat} flat wind speed samples")
@@ -86,16 +86,16 @@ for month in range(2, 11):
 # create a frequency hitogram with wibull fit line for wind speed at 10 m for the entire period (Feb to Oct 2026)
 wind_speed_all = wind_speed10_clean[time.dt.month.isin(range(2, 11))].dropna()
 wind_speed_all = wind_speed_all[wind_speed_all > 0]
-plt.figure(figsize=(10, 6))
-plt.hist(wind_speed_all, bins=20, density=True, alpha=0.6, color='b', label='Wind Speed Frequency')
-params = weibull_min.fit(wind_speed_all, floc=0)
-x = np.linspace(0, wind_speed_all.max(), 100)
-plt.plot(x, weibull_min.pdf(x, *params), 'r-', lw=2, label='Weibull Fit')
-plt.title('M2 Wind Speed at 10m - Feb to Oct 2026')
-plt.xlabel('Wind Speed [m/s]')
-plt.ylabel('Frequency')
-plt.legend()
-plt.show()
+# plt.figure(figsize=(10, 6))
+# plt.hist(wind_speed_all, bins=20, density=True, alpha=0.6, color='b', label='Wind Speed Frequency')
+# params = weibull_min.fit(wind_speed_all, floc=0)
+# x = np.linspace(0, wind_speed_all.max(), 100)
+# plt.plot(x, weibull_min.pdf(x, *params), 'r-', lw=2, label='Weibull Fit')
+# plt.title('M2 Wind Speed at 10m - Feb to Oct 2026')
+# plt.xlabel('Wind Speed [m/s]')
+# plt.ylabel('Frequency')
+# plt.legend()
+# plt.show()
 
 ################################################################
 #Wind rose plots for 50m and 80m 
@@ -134,6 +134,15 @@ RMAX = 20                         # fixed max radial frequency (%) shared by all
 # plt.show()
 
 #######################################
+ri_250 = ds_m2['Avg Richardson Number (2-50m)']
+# ri_280 = ds_m2['Avg Richardson Number (2-80m)']
+# ri_5080 = ds_m2['Avg Richardson Number (50-80m)']
+
+ri_250_neg = ri_250[ri_250 < 0]
+ri_250_pos = ri_250[ri_250 > 0]
+
+
+##########################################
 # Finding Relevent Events from finding extreme events
 
 #Start creating Bi-vibrate KDE joint plots with raw scatter between wind speed and temperature 
@@ -163,12 +172,15 @@ temperature50_clean = mask_flat_runs(temp50)
 # is_day = is_daytime(time)
 # REGIMES = {'Daytime': is_day, 'Nighttime': ~is_day}
 
-# #create a month by month basis bi_vibrate KDE joint PDF ellipses plots with raw scatter overlay beween 50m wind speed and temperature 
-# for month in range(2, 11):
-#     month_mask = (time.dt.month == month).values
+#Stability regimes from the 2-50m bulk Richardson number (variable ri_250 above):
+#Ri < 0 is unstable (convective), Ri > 0 is stable. Ri == 0 or NaN falls in neither regime.
+REGIMES = {'Ri (2-50m) < 0 (unstable)': (ri_250 < 0).to_numpy(),
+           'Ri (2-50m) > 0 (stable)': (ri_250 > 0).to_numpy()}
+#bivariate KDE joint PDF with raw scatter between 50m wind speed and temperature for the whole period (Jan 31 - Oct 17), split by Ri sign
+# if True:
 #     fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
 #     for ax, (regime, regime_mask) in zip(axes, REGIMES.items()):
-#         mask = month_mask & regime_mask
+#         mask = regime_mask
 #         wind_sp = wind_speed50_clean[mask].to_numpy()
 #         temp = temperature50_clean[mask].to_numpy()
 #         valid = ~(np.isnan(wind_sp) | np.isnan(temp))
@@ -192,20 +204,19 @@ temperature50_clean = mask_flat_runs(temp50)
 #         fig.colorbar(cf, ax=ax, label='Joint PDF')
 #         ax.set_title(f'{regime} (n={wind_sp.size})')
 
-#     fig.suptitle(f'M2 Bivariate KDE Joint PDF @ 50m - Month {month}')
+#     fig.suptitle('M2 Wind Speed vs Temperature Bivariate KDE Joint PDF @ 50m - Jan 31 to Oct 17, 2026')
 #     plt.tight_layout()
 #     plt.show()
 ############################################################################
 
 #do the same Bi-vibrate KDE joint month by month plots between 50m turbulence intensity and wind speed 
-turbi50 = ds_m2['Turbulence Intensity @ 50m']
+turbi50 = ds_m2['Avg Turbulence Intensity @ 50m']
 turbi50_clean = turbi50.where(turbi50.notnull(), np.nan)
 
-# for month in range(2, 11):
-#     month_mask = (time.dt.month == month).values
+# if True:
 #     fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
 #     for ax, (regime, regime_mask) in zip(axes, REGIMES.items()):
-#         mask = month_mask & regime_mask
+#         mask = regime_mask
 #         wind_sp = wind_speed50_clean[mask].to_numpy()
 #         turbi = turbi50_clean[mask].to_numpy()
 #         valid = ~(np.isnan(wind_sp) | np.isnan(turbi))
@@ -229,7 +240,7 @@ turbi50_clean = turbi50.where(turbi50.notnull(), np.nan)
 #         fig.colorbar(cf, ax=ax, label='Joint PDF')
 #         ax.set_title(f'{regime} (n={wind_sp.size})')
 
-#     fig.suptitle(f'M2 Bivariate KDE Joint PDF @ 50m - Month {month} (Turbulence Intensity vs Wind Speed)')
+#     fig.suptitle('M2 Bivariate KDE Joint PDF @ 50m - Jan 31 to Oct 17, 2026 (Turbulence Intensity vs Wind Speed)')
 #     plt.tight_layout()
 #     plt.show()
 #############################################
@@ -239,8 +250,8 @@ turbi50_clean = turbi50.where(turbi50.notnull(), np.nan)
 
 #both of thses KDE analysis have points that are outside the outer KDE contour ditribution level, 
 # indicating potential outliers or extreme values that are not well captured by the KDE.
-# Create a month to month time line of the values of wind speed ('--'), temperature ('-'), and turbulence intensity ('-.') 
-# for the night and day periods , (show the night time with a light grey background, and day time with a white background)
+# Create a whole-period time line of the values of wind speed ('--'), temperature ('-'), and turbulence intensity ('-.') 
+# as separate subplots on a shared time axis (grey shading where the 2-50 m Ri is negative)
 
 # For the outliers points from the pervious KDE, plot a highlierted line of WHEN the outliers occur over time.
 #For the outlier ofwind speed and temperature highlight with the color yellow in time 
@@ -248,92 +259,115 @@ turbi50_clean = turbi50.where(turbi50.notnull(), np.nan)
 #that so we can see when oulieres for both tpes of bi-variate KDE appear as the color orange (color mixing)
 
 #Outliers = samples outside the outermost KDE contour (density below the lowest contour level),
-#computed per month and per day/night regime, exactly like the KDE plots above.
+#computed over the whole period for each Ri regime, exactly like the KDE plots above.
+#Also returns the KDE joint PDF density at every sample (NaN where not evaluated); the outliers are the
+#samples whose density is below the lowest contour level.
 # def kde_outliers(a, b, base_mask, levels=15):
 #     out = np.zeros(len(a), dtype=bool)
+#     dens = np.full(len(a), np.nan)
 #     a, b = np.asarray(a), np.asarray(b)
 #     idx = np.where(base_mask & ~(np.isnan(a) | np.isnan(b)))[0]
 #     if idx.size < 3:
-#         return out
+#         return out, dens
 #     kde = gaussian_kde(np.vstack([a[idx], b[idx]]))
 #     x = np.linspace(a[idx].min(), a[idx].max(), 100)
 #     y = np.linspace(b[idx].min(), b[idx].max(), 100)
 #     X, Y = np.meshgrid(x, y)
 #     Z = kde(np.vstack([X.ravel(), Y.ravel()]))
 #     lowest_level = Z.min() + (Z.max() - Z.min()) / levels
-#     out[idx] = kde(np.vstack([a[idx], b[idx]])) < lowest_level
-#     return out
+#     dens[idx] = kde(np.vstack([a[idx], b[idx]]))
+#     out[idx] = dens[idx] < lowest_level
+#     return out, dens
 
-# ws_arr = wind_speed50_clean.to_numpy()
-# t_arr = temperature50_clean.to_numpy()
-# ti_arr = turbi50_clean.to_numpy()
-# month_arr = time.dt.month.to_numpy()
+def kde_outliers(a, b, base_mask, levels=15):
+    out = np.zeros(len(a), dtype=bool)
+    dens = np.full(len(a), np.nan)
+    a, b = np.asarray(a), np.asarray(b)
+    idx = np.where(base_mask & ~(np.isnan(a) | np.isnan(b)))[0]
+    if idx.size < 3:
+        return out, dens
+    kde = gaussian_kde(np.vstack([a[idx], b[idx]]))
+    x = np.linspace(a[idx].min(), a[idx].max(), 100)
+    y = np.linspace(b[idx].min(), b[idx].max(), 100)
+    X, Y = np.meshgrid(x, y)
+    Z = kde(np.vstack([X.ravel(), Y.ravel()]))
+    lowest_level = Z.min() + (Z.max() - Z.min()) / levels
+    dens[idx] = kde(np.vstack([a[idx], b[idx]]))
+    out[idx] = dens[idx] < lowest_level
+    return out, dens
 
-# out_ws_t = np.zeros(len(time), dtype=bool)   # wind speed vs temperature outliers
-# out_ti_ws = np.zeros(len(time), dtype=bool)  # turbulence intensity vs wind speed outliers
-# for month in range(2, 11):
-#     for regime_mask in REGIMES.values():
-#         base = (month_arr == month) & regime_mask
-#         out_ws_t |= kde_outliers(ws_arr, t_arr, base)
-#         out_ti_ws |= kde_outliers(ws_arr, ti_arr, base)
-# out_both = out_ws_t & out_ti_ws
+ws_arr = wind_speed50_clean.to_numpy()
+t_arr = temperature50_clean.to_numpy()
+ti_arr = turbi50_clean.to_numpy()
+out_ws_t = np.zeros(len(time), dtype=bool)   # wind speed vs temperature outliers
+out_ti_ws = np.zeros(len(time), dtype=bool)  # turbulence intensity vs wind speed outliers
+dens_ws_t = np.full(len(time), np.nan)       # joint PDF density, wind speed vs temperature
+dens_ti_ws = np.full(len(time), np.nan)      # joint PDF density, turbulence intensity vs wind speed
+#whole period (Jan 31 - Oct 17), one KDE per Ri regime, matching the KDE plots above
+for regime_mask in REGIMES.values():
+    o, d = kde_outliers(ws_arr, t_arr, regime_mask)
+    out_ws_t |= o; dens_ws_t[~np.isnan(d)] = d[~np.isnan(d)]
+    o, d = kde_outliers(ws_arr, ti_arr, regime_mask)
+    out_ti_ws |= o; dens_ti_ws[~np.isnan(d)] = d[~np.isnan(d)]
+out_both = out_ws_t & out_ti_ws
 
-#Month to month time lines: wind speed '--', temperature '-', turbulence intensity '-.'
-#night = light grey background, day = white; outlier times highlighted yellow / red / orange (both)
-# for month in range(2, 11):
-#     m = month_arr == month
-#     if not m.any():
-#         continue
-#     xm = time.values[m]
-#     night = ~is_day[m]
+# # Whole-period time line (Jan 31 - Oct 17) with a separate subplot per variable on a shared time axis.
+# # Grey shading = 2-50 m Ri < 0 (unstable); outlier times highlighted yellow / red / orange (both)
+# xt = time.values
+# unstable = REGIMES['Ri (2-50m) < 0 (unstable)']
+# series = [(ws_arr, 'Wind Speed @ 50m [m/s]', 'b', '-'),
+#           (t_arr, 'Temperature @ 50m [deg C]', 'k', '-'),
+#           (ti_arr, 'Turbulence Intensity @ 50m', 'g', '-')]
 
-#     fig, ax = plt.subplots(figsize=(18, 7))
-#     ax_t = ax.twinx()
-#     ax_ti = ax.twinx()
-#     ax_ti.spines['right'].set_position(('outward', 60))
+# fig, axes = plt.subplots(len(series), 1, figsize=(18, 10), sharex=True)
+# for ax, (values, label, color, ls) in zip(axes, series):
+#     ax.fill_between(xt, 0, 1, where=unstable, transform=ax.get_xaxis_transform(),
+#                     color='grey', alpha=0.35, step='mid', linewidth=0, zorder=0)
+#     for flag, c in ((out_ws_t & ~out_both, 'yellow'), (out_ti_ws & ~out_both, 'red'), (out_both, 'orange')):
+#         ax.fill_between(xt, 0, 1, where=flag, transform=ax.get_xaxis_transform(),
+#                         color=c, alpha=0.5, step='mid', linewidth=0, zorder=1)
+#     ax.plot(xt, values, color=color, ls=ls, lw=0.8, zorder=3)
+#     ax.set_ylabel(label)
+#     ax.grid(True, linestyle='--', alpha=0.3)
+# axes[0].legend(handles=[Patch(facecolor='grey', alpha=0.35, label='Ri (2-50m) < 0'),
+#                         Patch(facecolor='yellow', alpha=0.5, label='Outlier: wind speed vs temperature'),
+#                         Patch(facecolor='red', alpha=0.5, label='Outlier: turbulence intensity vs wind speed'),
+#                         Patch(facecolor='orange', alpha=0.5, label='Outlier: both')],
+#                loc='upper left', ncol=4, fontsize=8)
+# axes[-1].set_xlim(xt.min(), xt.max())
+# axes[-1].xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
+# axes[-1].set_xlabel('Time (MST)')
+# fig.suptitle('M2 Wind Speed, Temperature and Turbulence Intensity @ 50m - Jan 31 to Oct 17, 2026')
+# plt.tight_layout()
+# plt.show()
 
-#     ax.fill_between(xm, 0, 1, where=night, transform=ax.get_xaxis_transform(),
-#                     color='lightgrey', alpha=0.6, step='mid', linewidth=0, zorder=0)
-#     for flag, color in ((out_ws_t & ~out_both, 'yellow'), (out_ti_ws & ~out_both, 'red'), (out_both, 'orange')):
-#         ax.fill_between(xm, 0, 1, where=flag[m], transform=ax.get_xaxis_transform(),
-#                         color=color, alpha=0.5, step='mid', linewidth=0, zorder=1)
-
-#     l1, = ax.plot(xm, ws_arr[m], 'b--', lw=0.8, label='Wind Speed @ 50m [m/s]', zorder=3)
-#     l2, = ax_t.plot(xm, t_arr[m], 'k-', lw=0.8, label='Temperature @ 50m [deg C]', zorder=3)
-#     l3, = ax_ti.plot(xm, ti_arr[m], 'g-.', lw=0.8, label='Turbulence Intensity @ 50m', zorder=3)
-
-#     ax.set_ylabel('Wind Speed [m/s]', color='b')
-#     ax_t.set_ylabel('Temperature [deg C]')
-#     ax_ti.set_ylabel('Turbulence Intensity', color='g')
-#     ax.set_xlim(xm.min(), xm.max())
-#     ax.xaxis.set_major_formatter(mdates.DateFormatter('%m/%d'))
-
-#     legend_items = [l1, l2, l3,
-#                     Patch(facecolor='lightgrey', alpha=0.6, label='Night'),
-#                     Patch(facecolor='yellow', alpha=0.5, label='Outlier: wind speed vs temperature'),
-#                     Patch(facecolor='red', alpha=0.5, label='Outlier: turbulence intensity vs wind speed'),
-#                     Patch(facecolor='orange', alpha=0.5, label='Outlier: both')]
-#     ax.legend(handles=legend_items, loc='upper left', ncol=4, fontsize=8)
-#     ax.set_title(f'M2 Wind Speed, Temperature and Turbulence Intensity @ 50m - Month {month}')
-#     plt.tight_layout()
-#     plt.show()
 #####################################################################################
 # From the plots above we have a visual when the both the outliers occur simultaneously and when they occur individually for each parameter combination
 # Print a list and save a cvs of when both the outliers occur simultaneously with the corresponding timestamps and the parameter values
-# both_outliers_times = time[out_both]
-# both_outliers_ws = ws_arr[out_both]
-# both_outliers_t = t_arr[out_both]
-# both_outliers_ti = ti_arr[out_both]
+both_outliers_times = time[out_both]
+both_outliers_ws = ws_arr[out_both]
+both_outliers_t = t_arr[out_both]
+both_outliers_ti = ti_arr[out_both]
+#KDE joint PDF density of each outlier in its two bivariate KDEs (units: 1 / (unit_a * unit_b)); low = rarer.
+#The percentile is the share of all valid samples of that KDE with a density at or below this point's.
+def density_percentile(dens):
+    valid = dens[~np.isnan(dens)]
+    return np.array([(valid <= d).mean() * 100 for d in dens[out_both]])
 
-# both_outliers_df = pd.DataFrame({
-#     'Timestamp': both_outliers_times,
-#     'Wind Speed @ 50m [m/s]': both_outliers_ws,
-#     'Temperature @ 50m [deg C]': both_outliers_t,
-#     'Turbulence Intensity @ 50m': both_outliers_ti
-# })
-# print("Both outliers:")
-# print(both_outliers_df)
-# both_outliers_df.to_csv('both_outliers.csv', index=False)
+both_outliers_df = pd.DataFrame({
+    'Timestamp': both_outliers_times,
+    'Wind Speed @ 50m [m/s]': both_outliers_ws,
+    'Temperature @ 50m [deg C]': both_outliers_t,
+    'Turbulence Intensity @ 50m': both_outliers_ti,
+    'Joint PDF density (wind speed, temperature)': dens_ws_t[out_both],
+    'Joint PDF density (turbulence intensity, wind speed)': dens_ti_ws[out_both],
+    'Density percentile (wind speed, temperature) [%]': density_percentile(dens_ws_t),
+    'Density percentile (turbulence intensity, wind speed) [%]': density_percentile(dens_ti_ws),
+    'Ri (2-50m)': ri_250.to_numpy()[out_both]
+})
+print("Both outliers:")
+print(both_outliers_df)
+both_outliers_df.to_csv('M2_HOUR_50mboth_outliers.csv', index=False)
 
 ########################################### 
 #Now that we have a method to filter out when both of the outliers happen at the same time, 
