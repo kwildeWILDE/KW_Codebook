@@ -1,4 +1,4 @@
-#import necessary libraries
+﻿#import necessary libraries
 from webbrowser import get
 
 
@@ -119,17 +119,3 @@ print(extreme_events_ds)
 for requested, matched in zip(extreme_event_times, extreme_events_ds["time"].values):
     print(f"requested {requested} -> matched {pd.Timestamp(matched)}")
 
-#####
-#With tthe time of the extreme events known, we can now create wind speed profiles plots for those specific times in April
-for time in extreme_event_times:
-    # WS is (x, y, z) per scan; average over the horizontal domain to get a vertical profile
-    profile = ds.sel(time=time, method="nearest")["WS"].mean(dim=["x", "y"], skipna=True)
-    plt.figure()
-    plt.plot(profile, profile["z"])
-    plt.xlabel("Wind Speed (m/s)")
-    plt.ylabel("Height (m)")
-    # print the actual time from the dataset on the title for refrence
-    actual_time = ds.sel(time=time, method="nearest")["time"].values
-    plt.title(f"Wind Speed Profile at {pd.Timestamp(actual_time)}")
-    plt.grid(True)
-    plt.show()

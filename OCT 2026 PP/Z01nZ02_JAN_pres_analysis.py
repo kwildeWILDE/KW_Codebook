@@ -206,32 +206,35 @@ ds_merged['time'] = pd.to_datetime(ds_merged['time'].values)
 print(ds_merged['time'])
 
 # With the amount of extreme events, we can loop through these times and generate wind speed profiles for each one
-extreme_event_times = [
-    '2026-04-23 07:00',
-    '2026-04-23 14:00',
-    '2026-04-23 15:00',
-    '2026-04-23 16:00',
-    '2026-04-23 17:00',
-    '2026-05-07 08:00',
-    '2026-05-07 09:00',
-    '2026-05-07 13:00',
-    '2026-05-07 15:00',
-]
+event_days = {
+    'April 23, 2026': ['2026-04-23 07:00', '2026-04-23 14:00', '2026-04-23 15:00',
+                       '2026-04-23 16:00', '2026-04-23 17:00'],
+    'May 7, 2026': ['2026-05-07 08:00', '2026-05-07 09:00', '2026-05-07 13:00',
+                    '2026-05-07 15:00'],
+}
 
-for event_time in extreme_event_times:
-    event_dt = pd.to_datetime(event_time)
-    profile_z01 = ds_merged.sel(time=event_dt, method='nearest')[z01_var]
-    profile_z02 = ds_merged.sel(time=event_dt, method='nearest')[z02_var]
-    plt.figure(figsize=(4, 6))
-    plt.plot(profile_z01, ds_merged['height'],color='blue', label='Z01')
-    plt.plot(profile_z02, ds_merged['height'],color='red', label='Z02')
-    plt.xlabel('Wind Speed [m/s]')
-    plt.ylabel('Height [m]')
-    #print the actual time of the selected profile for reference on the title
-    plt.title(f'Wind Speed profile at {ds_merged.sel(time=event_dt, method="nearest")["time"].values} UTC')
-    plt.grid(True, alpha=0.2, ls='--')
-    plt.legend()
-    plt.tight_layout()
+# one figure per event day, one subplot per event time
+for day_label, day_times in event_days.items():
+    n = len(day_times)
+    ncols = min(n, 3)
+    nrows = int(np.ceil(n / ncols))
+    fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 5 * nrows),
+                             sharex=True, sharey=True, squeeze=False)
+    for ax, event_time in zip(axes.flat, day_times):
+        scan = ds_merged.sel(time=pd.to_datetime(event_time), method='nearest')
+        ax.plot(scan[z01_var], ds_merged['height'], color='blue', label='Z01')
+        ax.plot(scan[z02_var], ds_merged['height'], color='red', label='Z02')
+        #title shows the matched dataset time rounded to the nearest minute
+        ax.set_title(pd.Timestamp(scan['time'].values).round('min').strftime('%H:%M UTC'))
+        ax.grid(True, alpha=0.2, ls='--')
+    for ax in axes.flat[n:]:
+        ax.set_visible(False)
+    for ax in axes[:, 0]:
+        ax.set_ylabel('Height [m]')
+    for ax in axes[-1, :]:
+        ax.set_xlabel('Wind Speed [m/s]')
+    axes[0, 0].legend()
+    fig.suptitle(f'Wind Speed Profiles - {day_label}')
+    fig.tight_layout()
     plt.show()
-
     #something doesn't look right so it might be worth to create the wind speed profiles with thte ddopler data. 
