@@ -408,7 +408,8 @@ for event_time in extreme_event_times:
     plt.plot(profile['temperature'], profile['height'])
     plt.xlabel('Temperature [deg C]')
     plt.ylabel('Height [km]')
-    plt.title(f'Temperature profile at {event_time} UTC')
+    #should also print the actual time of the selected profile on the title 
+    plt.title(f'Temperature profile at {pd.to_datetime(profile["time"].values)} UTC')
     plt.grid(True, alpha=0.2, ls='--')
     plt.tight_layout()
     plt.show()
