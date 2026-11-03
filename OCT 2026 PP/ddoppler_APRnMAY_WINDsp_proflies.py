@@ -121,24 +121,105 @@ for requested, matched in zip(extreme_event_times, extreme_events_ds["time"].val
 ##################################################################
 # Wind speed profiles (horizontal mean of filtered WS vs height) for each April extreme event,
 # shown as subplots in one figure sharing the same axes
-ws_filtered = ds["WS"].where((ds["sigma_WS"] <= MAX_SIGMA_WS) & (ds["WS"] <= MAX_WIND_SPEED))
-profiles = ws_filtered.sel(time=extreme_event_times, method="nearest").mean(dim=["x", "y"], skipna=True)
+# ws_filtered = ds["WS"].where((ds["sigma_WS"] <= MAX_SIGMA_WS) & (ds["WS"] <= MAX_WIND_SPEED))
+# profiles = ws_filtered.sel(time=extreme_event_times, method="nearest").mean(dim=["x", "y"], skipna=True)
 
-n_events = len(extreme_event_times)
-fig, axes = plt.subplots(1, n_events, figsize=(4 * n_events, 5), sharex=True, sharey=True)
-for i, (ax, requested) in enumerate(zip(np.atleast_1d(axes), extreme_event_times)):
-    # positional indexing: several requested times can match the same timestamp
-    prof = profiles.isel(time=i)
-    ax.plot(prof.values, prof["z"].values, marker="o")
-    ax.set_title(f"{requested:%b %d %H:%M} UTC\n(data: {pd.Timestamp(prof['time'].values):%m-%d %H:%M})")
-    ax.set_xlabel("Wind speed (m/s)")
-    ax.grid(True)
-np.atleast_1d(axes)[0].set_ylabel("Height (m)")
-fig.suptitle("ddoppler April extreme event wind speed profiles")
-fig.tight_layout()
-plt.show()
+# n_events = len(extreme_event_times)
+# fig, axes = plt.subplots(1, n_events, figsize=(4 * n_events, 5), sharex=True, sharey=True)
+# for i, (ax, requested) in enumerate(zip(np.atleast_1d(axes), extreme_event_times)):
+#     # positional indexing: several requested times can match the same timestamp
+#     prof = profiles.isel(time=i)
+#     ax.plot(prof.values, prof["z"].values, marker="o")
+#     ax.set_title(f"{requested:%b %d %H:%M} UTC\n(data: {pd.Timestamp(prof['time'].values):%m-%d %H:%M})")
+#     ax.set_xlabel("Wind speed (m/s)")
+#     ax.grid(True)
+# np.atleast_1d(axes)[0].set_ylabel("Height (m)")
+# fig.suptitle("ddoppler April extreme event wind speed profiles")
+# fig.tight_layout()
+# plt.show()
 #############################################################################
 ###################################################
 # Pull the ddoppler data for the May extreme events 
 #get the data from pulling the ddoppler may 
 
+dp2 = "C:/Users/kwilde/OneDrive - NLR/Documents/GitHub/KW_Codebook/WDH_Data"
+df2 = f'{dp2}/corsair/fc.ddoppler.z01.c1/order_801ccf2d61234e8982974a026'
+
+#create one xarra dataset from all NetCDF files in order 
+nc_files = glob.glob(f'{df2}/*.nc')
+if not nc_files:
+    raise FileNotFoundError(f"No NetCDF files found in directory {df2}")
+
+#these files store timestamps in global attributes rather than coordinates 
+datasets = []
+for filepath in nc_files:
+	file_ds = xr.open_dataset(filepath)
+	start_time = file_ds.attrs.get("start_time")
+	if start_time is None:
+		file_ds.close()
+		raise ValueError(f"Missing start_time attribute in {filepath}")
+	datasets.append(file_ds.expand_dims(time=[pd.to_datetime(start_time)]))
+
+ds2 = xr.concat(datasets, dim="time").sortby("time")
+
+#In the mettadata sigma_WS is the standard deviation of the wind speed measurements,
+## which can be used as a quality indicator. We will filter out any values that are NaN or exceed a reasonable threshold for sigma_WS.
+sig_ws_values = ds2["sigma_WS"].values
+valid_sig_ws_values = sig_ws_values[np.isfinite(sig_ws_values)]
+print("Non-NaN sigma wind speed values:", valid_sig_ws_values)
+
+
+# Treat sigma_WS as a quality indicator, not as a correction to WS.
+MAX_SIGMA_WS = 1.0
+MAX_WIND_SPEED = np.mean(filtered_ws_values) + 2 * np.std(filtered_ws_values)  # Set a reasonable maximum wind speed for plotting
+## ^^ The reason for using mean + 2*std is to capture the majority of the data while excluding extreme outliers (i.e. + 2 values outside the std)
+##typically the 2+ std method captures about 95% of the data in a normal distribution
+#  This threshold helps ensure that the plotted wind speeds are representative 
+# of typical conditions rather than being dominated by rare, extreme events.
+print("Maximum wind speed for plotting:", MAX_WIND_SPEED)
+
+# Filter the wind speed values based on the quality indicator and maximum wind speed
+# Mask on the full arrays so WS and sigma_WS stay aligned (NaN comparisons are False)
+mask = (ds2["sigma_WS"] <= MAX_SIGMA_WS) & (ds2["WS"] <= MAX_WIND_SPEED)
+filtered_ws_values = ds2["WS"].where(mask).values
+filtered_ws_values = filtered_ws_values[np.isfinite(filtered_ws_values)]
+
+#MAY group of extreme event times 
+## MAY 7 08:00 UTC
+## MAY 7 09:00 UTC
+## MAY 7 13:00 UTC
+## MAY 7 15:00 UTC
+
+extreme_event_times_may = [
+    "2026-05-07 08:00:00",
+    "2026-05-07 09:00:00",
+    "2026-05-07 13:00:00",
+    "2026-05-07 15:00:00"
+]
+extreme_event_times_may = pd.to_datetime(extreme_event_times_may)
+extreme_events_ds_may = ds2.sel(time=extreme_event_times_may, method="nearest")
+print(extreme_events_ds_may)
+
+# Verify each requested time against the matched timestamp in the dataset
+for requested, matched in zip(extreme_event_times_may, extreme_events_ds_may["time"].values):
+    print(f"requested {requested} -> matched {pd.Timestamp(matched)}")
+
+# Wind speed profiles (horizontal mean of filtered WS vs height) for each May extreme event,
+# shown as subplots in one figure sharing the same axes
+ws_filtered_may = ds2["WS"].where((ds2["sigma_WS"] <= MAX_SIGMA_WS) & (ds2["WS"] <= MAX_WIND_SPEED))
+profiles_may = ws_filtered_may.sel(time=extreme_event_times_may, method="nearest").mean(dim=["x", "y"], skipna=True)
+
+n_events_may = len(extreme_event_times_may)
+fig, axes = plt.subplots(1, n_events_may, figsize=(4 * n_events_may, 5), sharex=True, sharey=True)
+for i, (ax, requested) in enumerate(zip(np.atleast_1d(axes), extreme_event_times_may)):
+    prof = profiles_may.isel(time=i)
+    ax.plot(prof.values, prof["z"].values, marker="o")
+    ax.set_title(f"{requested:%b %d %H:%M} UTC\n(data: {pd.Timestamp(prof['time'].values):%m-%d %H:%M})")
+    ax.set_xlabel("Wind speed (m/s)")
+    ax.grid(True)
+np.atleast_1d(axes)[0].set_ylabel("Height (m)")
+fig.suptitle("ddoppler May extreme event wind speed profiles")
+fig.tight_layout()
+plt.show()
+
+#######################################################
