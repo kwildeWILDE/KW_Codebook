@@ -168,15 +168,70 @@ ws_z01_flat = ws_z01_flat[valid_mask]
 ws_z02_flat = ws_z02_flat[valid_mask]
 
 # create the linear regression plot
-plt.figure(figsize=(6, 6))
-plt.scatter(ws_z01_flat, ws_z02_flat, alpha=0.5)
-plt.xlabel('Z01 Wind Speed (m/s)')
-plt.ylabel('Z02 Wind Speed (m/s)')
-plt.title('Linear Regression of Wind Speeds from Z01 and Z02')
-# fit a linear regression line
-# calculate the slope and intercept for the linear regression line
-# calculate the slope and intercept for the linear regression line using numpy's polyfit function
-m, b = np.polyfit(ws_z01_flat, ws_z02_flat, 1)
-plt.plot(ws_z01_flat, m * ws_z01_flat + b, color='red', label='Linear Fit (y = {:.2f}x + {:.2f})'.format(m, b))
-plt.legend(loc='best')
-plt.show()
+# plt.figure(figsize=(6, 6))
+# plt.scatter(ws_z01_flat, ws_z02_flat, alpha=0.5)
+# plt.xlabel('Z01 Wind Speed (m/s)')
+# plt.ylabel('Z02 Wind Speed (m/s)')
+# plt.title('Linear Regression of Wind Speeds from Z01 and Z02')
+# # fit a linear regression line
+# # calculate the slope and intercept for the linear regression line
+# # calculate the slope and intercept for the linear regression line using numpy's polyfit function
+# m, b = np.polyfit(ws_z01_flat, ws_z02_flat, 1)
+# plt.plot(ws_z01_flat, m * ws_z01_flat + b, color='red', label='Linear Fit (y = {:.2f}x + {:.2f})'.format(m, b))
+# plt.legend(loc='best')
+# plt.show()
+
+#########################################################
+# With some more analysis we have time and dates of when extreme wind events occur, 
+## For the exact outlier time, crate a wind speed profile plot for that specific time.
+# try to combine the data from z01 and z02 to get the most height possible for the wind speed profile
+
+# First group of extreme event times 
+## APRIL 23 07:00 UTC
+## APRIL 23 14:00 UTC
+## APRIL 23 15:00 UTC
+## APRIL 23 16:00 UTC
+## APRIL 23 17:00 UTC
+
+#SECOND group of extreme event times 
+## MAY 7 08:00 UTC
+## MAY 7 09:00 UTC
+## MAY 7 13:00 UTC
+## MAY 7 15:00 UTC
+
+#print the head of the merged dataset to see the layout of the time variable
+# print(ds_merged.head())
+# print(ds_merged['time'])
+ds_merged['time'] = pd.to_datetime(ds_merged['time'].values)
+print(ds_merged['time'])
+
+# With the amount of extreme events, we can loop through these times and generate wind speed profiles for each one
+extreme_event_times = [
+    '2026-04-23 07:00',
+    '2026-04-23 14:00',
+    '2026-04-23 15:00',
+    '2026-04-23 16:00',
+    '2026-04-23 17:00',
+    '2026-05-07 08:00',
+    '2026-05-07 09:00',
+    '2026-05-07 13:00',
+    '2026-05-07 15:00',
+]
+
+for event_time in extreme_event_times:
+    event_dt = pd.to_datetime(event_time)
+    profile_z01 = ds_merged.sel(time=event_dt, method='nearest')[z01_var]
+    profile_z02 = ds_merged.sel(time=event_dt, method='nearest')[z02_var]
+    plt.figure(figsize=(4, 6))
+    plt.plot(profile_z01, ds_merged['height'],color='blue', label='Z01')
+    plt.plot(profile_z02, ds_merged['height'],color='red', label='Z02')
+    plt.xlabel('Wind Speed [m/s]')
+    plt.ylabel('Height [m]')
+    #print the actual time of the selected profile for reference on the title
+    plt.title(f'Wind Speed profile at {ds_merged.sel(time=event_dt, method="nearest")["time"].values} UTC')
+    plt.grid(True, alpha=0.2, ls='--')
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
+
+    #something doesn't look right so it might be worth to create the wind speed profiles with thte ddopler data. 
