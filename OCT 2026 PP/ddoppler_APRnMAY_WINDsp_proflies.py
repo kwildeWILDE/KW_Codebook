@@ -86,11 +86,11 @@ print("Percentage of data retained after filtering:", 100 * len(filtered_ws_valu
 #with the group of the extreme outliers we can create a wind speed profile for that excat time IN APRIL 
 
 # APRIL group of extreme event times 
-## APRIL 23 07:00 UTC
+## APRIL 23 06:00 UTC
+## APRIL 23 13:00 UTC
 ## APRIL 23 14:00 UTC
 ## APRIL 23 15:00 UTC
 ## APRIL 23 16:00 UTC
-## APRIL 23 17:00 UTC
 
 #print the head of the datasee to see how the time varaible is presented
 # print(ds.head())
@@ -105,9 +105,10 @@ print(ds["time"].head())  # Verify the time conversion
 
 # Filter the dataset for the extreme event times in April
 extreme_event_times = [
+    # "2026-04-23 13:00:00",
+    # "2026-04-23 14:00:00",
     "2026-04-23 15:00:00",
-    "2026-04-23 16:00:00",
-    "2026-04-23 17:00:00"
+    "2026-04-23 16:00:00"
 ]
 extreme_event_times = pd.to_datetime(extreme_event_times)
 extreme_events_ds = ds.sel(time=extreme_event_times, method="nearest")
@@ -121,22 +122,22 @@ for requested, matched in zip(extreme_event_times, extreme_events_ds["time"].val
 ##################################################################
 # Wind speed profiles (horizontal mean of filtered WS vs height) for each April extreme event,
 # shown as subplots in one figure sharing the same axes
-# ws_filtered = ds["WS"].where((ds["sigma_WS"] <= MAX_SIGMA_WS) & (ds["WS"] <= MAX_WIND_SPEED))
-# profiles = ws_filtered.sel(time=extreme_event_times, method="nearest").mean(dim=["x", "y"], skipna=True)
+ws_filtered = ds["WS"].where((ds["sigma_WS"] <= MAX_SIGMA_WS) & (ds["WS"] <= MAX_WIND_SPEED))
+profiles = ws_filtered.sel(time=extreme_event_times, method="nearest").mean(dim=["x", "y"], skipna=True)
 
-# n_events = len(extreme_event_times)
-# fig, axes = plt.subplots(1, n_events, figsize=(4 * n_events, 5), sharex=True, sharey=True)
-# for i, (ax, requested) in enumerate(zip(np.atleast_1d(axes), extreme_event_times)):
-#     # positional indexing: several requested times can match the same timestamp
-#     prof = profiles.isel(time=i)
-#     ax.plot(prof.values, prof["z"].values, marker="o")
-#     ax.set_title(f"{requested:%b %d %H:%M} UTC\n(data: {pd.Timestamp(prof['time'].values):%m-%d %H:%M})")
-#     ax.set_xlabel("Wind speed (m/s)")
-#     ax.grid(True)
-# np.atleast_1d(axes)[0].set_ylabel("Height (m)")
-# fig.suptitle("ddoppler April extreme event wind speed profiles")
-# fig.tight_layout()
-# plt.show()
+n_events = len(extreme_event_times)
+fig, axes = plt.subplots(1, n_events, figsize=(4 * n_events, 5), sharex=True, sharey=True)
+for i, (ax, requested) in enumerate(zip(np.atleast_1d(axes), extreme_event_times)):
+    # positional indexing: several requested times can match the same timestamp
+    prof = profiles.isel(time=i)
+    ax.plot(prof.values, prof["z"].values, marker="o")
+    ax.set_title(f"{requested:%b %d %H:%M} UTC\n(data: {pd.Timestamp(prof['time'].values):%m-%d %H:%M})")
+    ax.set_xlabel("Wind speed (m/s)")
+    ax.grid(True)
+np.atleast_1d(axes)[0].set_ylabel("Height (m)")
+fig.suptitle("ddoppler April extreme event wind speed profiles")
+fig.tight_layout()
+plt.show()
 #############################################################################
 ###################################################
 # Pull the ddoppler data for the May extreme events 
@@ -185,22 +186,22 @@ filtered_ws_values = ds2["WS"].where(mask).values
 filtered_ws_values = filtered_ws_values[np.isfinite(filtered_ws_values)]
 
 #MAY group of extreme event times 
+## MAY 7 07:00 UTC
 ## MAY 7 08:00 UTC
-## MAY 7 09:00 UTC
-## MAY 7 13:00 UTC
-## MAY 7 15:00 UTC
+## MAY 7 12:00 UTC
+## MAY 7 14:00 UTC
 
 extreme_event_times_may = [
+    "2026-05-07 07:00:00",
     "2026-05-07 08:00:00",
-    "2026-05-07 09:00:00",
-    "2026-05-07 13:00:00",
-    "2026-05-07 15:00:00"
+    "2026-05-07 12:00:00",
+    "2026-05-07 14:00:00"
 ]
 extreme_event_times_may = pd.to_datetime(extreme_event_times_may)
 extreme_events_ds_may = ds2.sel(time=extreme_event_times_may, method="nearest")
 print(extreme_events_ds_may)
 
-# Verify each requested time against the matched timestamp in the dataset
+# # Verify each requested time against the matched timestamp in the dataset
 for requested, matched in zip(extreme_event_times_may, extreme_events_ds_may["time"].values):
     print(f"requested {requested} -> matched {pd.Timestamp(matched)}")
 
