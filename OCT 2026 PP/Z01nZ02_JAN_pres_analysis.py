@@ -187,17 +187,17 @@ ws_z02_flat = ws_z02_flat[valid_mask]
 # try to combine the data from z01 and z02 to get the most height possible for the wind speed profile
 
 # First group of extreme event times 
-## APRIL 23 07:00 UTC
+## APRIL 23 06:00 UTC
+## APRIL 23 13:00 UTC
 ## APRIL 23 14:00 UTC
 ## APRIL 23 15:00 UTC
 ## APRIL 23 16:00 UTC
-## APRIL 23 17:00 UTC
 
 #SECOND group of extreme event times 
+## MAY 7 07:00 UTC
 ## MAY 7 08:00 UTC
-## MAY 7 09:00 UTC
-## MAY 7 13:00 UTC
-## MAY 7 15:00 UTC
+## MAY 7 12:00 UTC
+## MAY 7 14:00 UTC
 
 #print the head of the merged dataset to see the layout of the time variable
 # print(ds_merged.head())
@@ -207,10 +207,10 @@ print(ds_merged['time'])
 
 # With the amount of extreme events, we can loop through these times and generate wind speed profiles for each one
 event_days = {
-    'April 23, 2026': ['2026-04-23 07:00', '2026-04-23 14:00', '2026-04-23 15:00',
-                       '2026-04-23 16:00', '2026-04-23 17:00'],
-    'May 7, 2026': ['2026-05-07 08:00', '2026-05-07 09:00', '2026-05-07 13:00',
-                    '2026-05-07 15:00'],
+    'April 23, 2026': ['2026-04-23 06:00', '2026-04-23 13:00', '2026-04-23 14:00',
+                       '2026-04-23 15:00', '2026-04-23 16:00'],
+    'May 7, 2026': ['2026-05-07 07:00', '2026-05-07 08:00',
+                    '2026-05-07 12:00', '2026-05-07 14:00'],
 }
 
 # one figure per event day, one subplot per event time
