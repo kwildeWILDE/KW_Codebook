@@ -369,17 +369,17 @@ levels = np.linspace(vmin, vmax, 21)
 # with the assist dataset, make make a tempature profile for that exact time and date 
 
 # First group of extreme event times 
-## APRIL 23 07:00 UTC
+## APRIL 23 06:00 UTC
+## APRIL 23 13:00 UTC
 ## APRIL 23 14:00 UTC
 ## APRIL 23 15:00 UTC
 ## APRIL 23 16:00 UTC
-## APRIL 23 17:00 UTC
 
 #SECOND group of extreme event times 
+## MAY 7 07:00 UTC
 ## MAY 7 08:00 UTC
-## MAY 7 09:00 UTC
-## MAY 7 13:00 UTC
-## MAY 7 15:00 UTC
+## MAY 7 12:00 UTC
+## MAY 7 14:00 UTC
 
 #print the head of the at dataset to see the layout of the time variable 
 # print(ds_at_filtered.head())
@@ -388,30 +388,48 @@ levels = np.linspace(vmin, vmax, 21)
 ds_at_filtered['time'] = pd.to_datetime(ds_at_filtered['time'].values)
 print(ds_at_filtered['time'])
 
-# With the amount of extreme events, we can loop through these times and generate temperature profiles for each one
-extreme_event_times = [
-    '2026-04-23 07:00',
-    '2026-04-23 14:00',
-    '2026-04-23 15:00',
-    '2026-04-23 16:00',
-    '2026-04-23 17:00',
-    '2026-05-07 08:00',
-    '2026-05-07 09:00',
-    '2026-05-07 13:00',
-    '2026-05-07 15:00',
-]
+# Plot each month's extreme-event profiles together, with one subplot per time.
+extreme_event_times_by_month = {
+    'April 23, 2026': [
+        '2026-04-23 06:00',
+        '2026-04-23 13:00',
+        '2026-04-23 14:00',
+        '2026-04-23 15:00',
+        '2026-04-23 16:00',
+    ],
+    'May 7, 2026': [
+        '2026-05-07 07:00',
+        '2026-05-07 08:00',
+        '2026-05-07 12:00',
+        '2026-05-07 14:00',
+    ],
+}
 
-for event_time in extreme_event_times:
-    event_dt = pd.to_datetime(event_time)
-    profile = ds_at_filtered.sel(time=event_dt, method='nearest')
-    plt.figure(figsize=(4, 6))
-    plt.plot(profile['temperature'], profile['height'])
-    plt.xlabel('Temperature [deg C]')
-    plt.ylabel('Height [km]')
-    #should also print the actual time of the selected profile on the title 
-    plt.title(f'Temperature profile at {pd.to_datetime(profile["time"].values)} UTC')
-    plt.grid(True, alpha=0.2, ls='--')
-    plt.tight_layout()
+for month_label, event_times in extreme_event_times_by_month.items():
+    ncols = 2
+    nrows = (len(event_times) + ncols - 1) // ncols
+    fig, axes = plt.subplots(
+        nrows, ncols, figsize=(10, 4 * nrows), sharex=True, sharey=True, squeeze=False
+    )
+
+    for ax, event_time in zip(axes.flat, event_times):
+        event_dt = pd.to_datetime(event_time)
+        profile = ds_at_filtered.sel(time=event_dt, method='nearest')
+        profile_time = pd.to_datetime(profile['time'].values)
+        ax.plot(profile['temperature'], profile['height'])
+        ax.set_title(
+            f'Requested {event_dt:%H:%M} UTC\n'
+            f'Profile {profile_time:%H:%M} UTC'
+        )
+        ax.set_xlabel('Temperature [deg C]')
+        ax.set_ylabel('Height [km]')
+        ax.grid(True, alpha=0.2, ls='--')
+
+    for ax in axes.flat[len(event_times):]:
+        ax.set_visible(False)
+
+    fig.suptitle(f'ASSIST.TROpoeTemperature profiles during extreme events: {month_label}')
+    fig.tight_layout(rect=(0, 0, 1, 0.96))
     plt.show()
 
 ######################################################### 
