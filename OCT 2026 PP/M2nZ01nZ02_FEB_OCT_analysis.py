@@ -38,7 +38,7 @@ ds_m2 = ds_m2.replace(-99999, np.nan)
 ## The M2 timestamps are in MST (UTC-7) all year (no daylight saving shift; verified
 ## against the Z02 lidar wind speed), so UTC = MST + 7 h.
 ds_m2['DS_time'] = pd.to_datetime(ds_m2['DATE (MM/DD/YYYY)'].astype(str) + ' ' + ds_m2['MST'].astype(str))
-ds_m2['UTC_time'] = ds_m2['DS_time'] + pd.Timedelta(hours=7)
+ds_m2['UTC_time'] = ds_m2['DS_time'] + pd.Timedelta(hours=6)
 
 # print("M2 data loaded and converted to UTC.", 
 #       ds_m2['UTC_time'].astype(str) )
