@@ -83,7 +83,7 @@ print("M2 dataset successfully flat-run filtered and resampled to 10-minute inte
 #Pull the ASSIST data from the directory
 
 dp_at = "c:/Users/kwilde/OneDrive - NLR/Documents/GitHub/KW_Codebook/WDH_Data/corsair/s40.assist.tropoe.z01.c0"
-at_files = f'{dp_at}/order_0345338a149b488b8aabb6f46'
+at_files = f'{dp_at}/order_d2367f95defb49029b6d5dc00'
 
 #collect every .nc file in order of time 
 nc_files = sorted(glob.glob(f'{at_files}/*.nc'))
@@ -200,11 +200,11 @@ height_colors = {
 #make sure they have the same variable for the month of the year
 
 
-# Now try to make a month by month (late FEB - late JUN) temperature over height heat map (from the ASSIST dataset) 
+# Now try to make a month by month (late FEB - JUL) temperature over height heat map (from the ASSIST dataset)
 # with M2 scatter points
 import matplotlib.pyplot as plt
 
-months = [2, 3, 4, 5, 6]  # late February to late June
+months = [2, 3, 4, 5, 6, 7]  # late February through July
 
 #load the small 0-200m ASSIST subset into memory so boolean masks can be used (dask arrays can't be indexed by boolean dask arrays)
 at_temp_0_100m = at_temp_0_100m.load()
@@ -263,7 +263,12 @@ m2_months = ds_m2_filtered['UTC_time'].dt.month
 # PBL height is a time-only retrieval; use the time-quality filter, not the
 # height-dependent cloud mask that broadcasts it across all height levels.
 at_pblh = ds_at['pblh'].where((ds_at['rmsa'] <= 5) & (ds_at['gamma'] <= 3)).load()
-at_pblh = at_pblh.where(np.isfinite(at_pblh) & (at_pblh >= 0)) * 1000  # km to m
+PBL_MAX_HEIGHT_KM = 5.0  # Exclude heights at or above 5 km from the diurnal mean.
+pbl_valid = np.isfinite(at_pblh) & (at_pblh >= 0) & (at_pblh < PBL_MAX_HEIGHT_KM)
+print(f"PBL quality-filtered observations excluded as negative or >= {PBL_MAX_HEIGHT_KM:g} km: "
+      f"{int((np.isfinite(at_pblh) & ~pbl_valid).sum().item())}; "
+      f"retained: {int(pbl_valid.sum().item())}")
+at_pblh = at_pblh.where(pbl_valid) * 1000  # km to m
 pbl_times = pd.to_datetime(at_pblh['time'].values)
 pbl_diurnal = pd.Series(
     at_pblh.values,
@@ -299,7 +304,7 @@ m2_diurnal_src = pd.DataFrame({
 })
 m2_diurnal = m2_diurnal_src.groupby(['month', 'hour']).mean()
 
-month_names = {2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June'}
+month_names = {2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July'}
 
 # One shared color scale for both height ranges, all months, and the M2 points.
 plot_values = np.concatenate(
