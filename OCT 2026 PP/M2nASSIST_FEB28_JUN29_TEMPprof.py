@@ -126,7 +126,7 @@ m2_temp_2m = ds_m2_filtered["Temperature @ 2m [deg C]"]
 m2_temp_50m = ds_m2_filtered["Temperature @ 50m [deg C]"]
 #m2_temp_80m = ds_m2_filtered["Temperature @ 80m [deg C]"]
 
-# Compare each M2 sensor with the nearest available ASSIST height, without interpolating.
+# Linearly interpolate ASSIST temperatures in height to each M2 sensor.
 m2_temp_by_height = {
     2: m2_temp_2m,
     50: m2_temp_50m,
@@ -149,7 +149,7 @@ MATCH_TOLERANCE = pd.Timedelta(minutes=5)
 
 # fig, axes = plt.subplots(1, 2, figsize=(12, 6), squeeze=False)
 # for ax, (m2_height, m2_temp) in zip(axes[0], m2_temp_by_height.items()):
-#     at_temp = ds_at_filtered['temperature'].sel(height=m2_height / 1000, method='nearest')
+#     at_temp = ds_at_filtered['temperature'].interp(height=m2_height / 1000, method='linear')
 #     at_height = float(at_temp['height'].values) * 1000
 #     matched = match_on_utc(m2_temp, at_temp)
 #     x, y = matched['m2'].values, matched['at'].values
@@ -160,11 +160,11 @@ MATCH_TOLERANCE = pd.Timedelta(minutes=5)
 #         ax.plot(xs, slope * xs + intercept, color='red', lw=2,
 #                 label=f'y = {slope:.3f}x + {intercept:.3f}\n$R^2$ = {r**2:.4f}, n = {x.size}')
 #         ax.legend(loc='upper left')
-#         print(f"M2 {m2_height}m vs ASSIST {at_height:g}m: slope {slope:.4f}, intercept {intercept:.4f}, R2 {r**2:.4f}, n {x.size}")
+#         print(f"M2 {m2_height}m vs ASSIST interpolated to {at_height:g}m: slope {slope:.4f}, intercept {intercept:.4f}, R2 {r**2:.4f}, n {x.size}")
 #     else:
 #         print(f"Cannot fit M2 {m2_height}m vs ASSIST {at_height:g}m: not enough distinct matched M2 temperatures (n = {x.size}).")
 #     ax.set_xlabel(f'M2 Temperature at {m2_height}m [deg C]')
-#     ax.set_ylabel(f'ASSIST Temperature at {at_height:g}m [deg C]')
+#     ax.set_ylabel(f'ASSIST Temperature at {at_height:g}m (interpolated) [deg C]')
 #     ax.set_title(f'M2 (10-min interval) {m2_height}m vs ASSIST {at_height:g}m', fontsize=10)
 #     ax.set_box_aspect(1)
 #     ax.grid(True, alpha=0.2, ls='--')
@@ -258,6 +258,18 @@ m2_months = ds_m2_filtered['UTC_time'].dt.month
 #Have not saved the plots with the max height of 100m 
 ##########################################################################
 ## Monthly diurnal temperature profiles in UTC, with M2 at 2 m and 50 m.
+## With the ASSIST planetary boundary layer height included in the plots.
+
+# PBL height is a time-only retrieval; use the time-quality filter, not the
+# height-dependent cloud mask that broadcasts it across all height levels.
+at_pblh = ds_at['pblh'].where((ds_at['rmsa'] <= 5) & (ds_at['gamma'] <= 3)).load()
+at_pblh = at_pblh.where(np.isfinite(at_pblh) & (at_pblh >= 0)) * 1000  # km to m
+pbl_times = pd.to_datetime(at_pblh['time'].values)
+pbl_diurnal = pd.Series(
+    at_pblh.values,
+    index=pd.MultiIndex.from_arrays([pbl_times.month, pbl_times.hour], names=['month', 'hour']),
+).groupby(level=['month', 'hour']).mean()
+
 at_temp_0_2000m = ds_at_filtered['temperature'].sel(height=slice(0, 2.0)).load()
 at_temp_0_2000m = at_temp_0_2000m.where((at_temp_0_2000m > -50) & (at_temp_0_2000m < 50))
 at_utc = pd.to_datetime(at_temp_0_2000m['time'].values)
@@ -349,6 +361,11 @@ for row, (heights, profiles, max_height) in enumerate([
                            edgecolors=height_colors[m2_h], linewidths=1.2, zorder=3)
             ax.axhline(m2_h, color=height_colors[m2_h], lw=0.6, ls=':')
 
+        if month in pbl_diurnal.index.get_level_values('month'):
+            pbl_month = pbl_diurnal.loc[month].reindex(hours)
+            ax.plot(hours, pbl_month.values, color='black', linewidth=2.8, zorder=4)
+            ax.plot(hours, pbl_month.values, color='white', linewidth=1.3, zorder=5)
+
         ax.set_title(f'{month_names[month]} (0-{max_height} m)', pad=10)
         ax.set_xlim(-0.5, 23.5)
         ax.set_ylim(0, max_height)
@@ -357,18 +374,19 @@ for row, (heights, profiles, max_height) in enumerate([
         ax.grid(True, alpha=0.2, ls='--')
     axes[row, 0].set_ylabel('Height [m]', labelpad=8)
 fig.colorbar(heatmap, ax=axes, pad=0.02, label='Temperature [deg C] (ASSIST heat map and M2 points)')
-fig.supxlabel('M2 circles: cyan outline = 2 m, tomato outline = 50 m; fill color = temperature', fontsize=9)
+fig.supxlabel('M2 circles: cyan outline = 2 m, tomato outline = 50 m; fill color = temperature\n'
+              'White line with black outline = monthly hourly mean PBL height', fontsize=9)
 fig.suptitle('UTC diurnal mean temperature: ASSIST heat map and smoothed contours with M2 points', fontsize=14)
 plt.show()
 
-#numeric agreement (ASSIST nearest level minus M2) per month, averaged over the diurnal cycle
-for month in months:
-    for m2_h, at_h in [(2, 0), (50, 46)]:
-        k = np.argmin(np.abs(at_heights_m - at_h))
-        if month in m2_diurnal.index.get_level_values('month'):
-            m2_m = m2_diurnal.loc[month][m2_h].reindex(hours).values
-            diff = at_diurnal[month][:, k] - m2_m
-            print(f"{month_names[month]} M2 {m2_h}m vs ASSIST {at_h}m: mean bias {np.nanmean(diff):.2f} C, RMSE {np.sqrt(np.nanmean(diff**2)):.2f} C")
+# #numeric agreement (ASSIST nearest level minus M2) per month, averaged over the diurnal cycle
+# for month in months:
+#     for m2_h, at_h in [(2, 0), (50, 46)]:
+#         k = np.argmin(np.abs(at_heights_m - at_h))
+#         if month in m2_diurnal.index.get_level_values('month'):
+#             m2_m = m2_diurnal.loc[month][m2_h].reindex(hours).values
+#             diff = at_diurnal[month][:, k] - m2_m
+#             print(f"{month_names[month]} M2 {m2_h}m vs ASSIST {at_h}m: mean bias {np.nanmean(diff):.2f} C, RMSE {np.sqrt(np.nanmean(diff**2)):.2f} C")
 
 ################################################################################
 # after some analysis we have times and dates of when extreme events are happening

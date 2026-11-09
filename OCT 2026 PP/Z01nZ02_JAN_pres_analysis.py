@@ -121,31 +121,57 @@ vmax = 10 # set maximum wind speed for color scale
 levels = np.linspace(vmin, vmax, 15)   #contourf ignores vmin/vmax unless levels are given
 
 #only plot months that have data
-# ncols = min(6, len(months))
-# nrows = int(np.ceil(len(months) / ncols))
-# fig, axes = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3.5 * nrows),
-#                          sharex=True, sharey=True, squeeze=False, layout='constrained')
-# for ax in axes.flat[len(months):]:
-#     ax.set_visible(False)
-# for ax, month in zip(axes.flat, months):
-#     ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
-#     prof = ws_masked.sel(month=month).transpose('height', 'hour')
-#     prof = prof.sel(height=slice(0, max_height))
-#     hrs, hts = prof['hour'].values, prof['height'].values
-#     # use contourf + contour to make it less pixelated
-#     pcm = ax.contourf(hrs, hts, prof.values, levels=levels, cmap='viridis', extend='both')
-#     ax.contour(hrs, hts, prof.values, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
-#     ax.set_xticks([0, 6, 12, 18])
-#     ax.set_ylim(0, max_height)
-# for ax in axes[-1]:
-#     ax.set_xlabel('Time (UTC)')
-# for ax in axes[:, 0]:
-#     ax.set_ylabel('Height (m AGL)')
-# #colorbar and legend sit below the panels so they don't crowd the plots
-# fig.colorbar(pcm, ax=axes, location='bottom', shrink=0.5, aspect=40, pad=0.03,
-#              label='Mean wind speed (m/s)')
-# fig.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02', fontsize=10)
-# plt.show()
+ncols = min(6, len(months))
+nrows = int(np.ceil(len(months) / ncols))
+fig, axes = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3.5 * nrows),
+                         sharex=True, sharey=True, squeeze=False, layout='constrained')
+for ax in axes.flat[len(months):]:
+    ax.set_visible(False)
+for ax, month in zip(axes.flat, months):
+    ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
+    prof = ws_masked.sel(month=month).transpose('height', 'hour')
+    prof = prof.sel(height=slice(0, max_height))
+    hrs, hts = prof['hour'].values, prof['height'].values
+    # use contourf + contour to make it less pixelated
+    pcm = ax.contourf(hrs, hts, prof.values, levels=levels, cmap='viridis', extend='both')
+    ax.contour(hrs, hts, prof.values, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
+    ax.set_xticks([0, 6, 12, 18])
+    ax.set_ylim(0, max_height)
+for ax in axes[-1]:
+    ax.set_xlabel('Time (UTC)')
+for ax in axes[:, 0]:
+    ax.set_ylabel('Height (m AGL)')
+#colorbar and legend sit below the panels so they don't crowd the plots
+fig.colorbar(pcm, ax=axes, location='bottom', shrink=0.5, aspect=40, pad=0.03,
+             label='Mean wind speed (m/s)')
+fig.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02', fontsize=10)
+plt.show()
+
+# MONTHLY DIURNAL CYCLE PANELS (Extended Height): color = mean wind speed (hour x height) up to 2000m
+max_height_extended = 2000   #m AGL upper limit for extended plots
+fig2, axes2 = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3.5 * nrows),
+                          sharex=True, sharey=True, squeeze=False, layout='constrained')
+for ax in axes2.flat[len(months):]:
+    ax.set_visible(False)
+for ax, month in zip(axes2.flat, months):
+    ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
+    prof = ws_masked.sel(month=month).transpose('height', 'hour')
+    prof = prof.sel(height=slice(0, max_height_extended))
+    hrs, hts = prof['hour'].values, prof['height'].values
+    # use contourf + contour to make it less pixelated
+    pcm2 = ax.contourf(hrs, hts, prof.values, levels=levels, cmap='viridis', extend='both')
+    ax.contour(hrs, hts, prof.values, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
+    ax.set_xticks([0, 6, 12, 18])
+    ax.set_ylim(0, max_height_extended)
+for ax in axes2[-1]:
+    ax.set_xlabel('Time (UTC)')
+for ax in axes2[:, 0]:
+    ax.set_ylabel('Height (m AGL)')
+#colorbar and legend sit below the panels so they don't crowd the plots
+fig2.colorbar(pcm2, ax=axes2, location='bottom', shrink=0.5, aspect=40, pad=0.03,
+             label='Mean wind speed (m/s)')
+fig2.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02 (0-2000m)', fontsize=10)
+plt.show()
 
 ###################################################################################
 # Make a linear regression plot from the wind speeds from z01 and z02 at the same heights and times
@@ -214,27 +240,27 @@ event_days = {
 }
 
 # one figure per event day, one subplot per event time
-for day_label, day_times in event_days.items():
-    n = len(day_times)
-    ncols = min(n, 3)
-    nrows = int(np.ceil(n / ncols))
-    fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 5 * nrows),
-                             sharex=True, sharey=True, squeeze=False)
-    for ax, event_time in zip(axes.flat, day_times):
-        scan = ds_merged.sel(time=pd.to_datetime(event_time), method='nearest')
-        ax.plot(scan[z01_var], ds_merged['height'], color='blue', label='Z01')
-        ax.plot(scan[z02_var], ds_merged['height'], color='red', label='Z02')
-        #title shows the matched dataset time rounded to the nearest minute
-        ax.set_title(pd.Timestamp(scan['time'].values).round('min').strftime('%H:%M UTC'))
-        ax.grid(True, alpha=0.2, ls='--')
-    for ax in axes.flat[n:]:
-        ax.set_visible(False)
-    for ax in axes[:, 0]:
-        ax.set_ylabel('Height [m]')
-    for ax in axes[-1, :]:
-        ax.set_xlabel('Wind Speed [m/s]')
-    axes[0, 0].legend()
-    fig.suptitle(f'Wind Speed Profiles - {day_label}')
-    fig.tight_layout()
-    plt.show()
+# for day_label, day_times in event_days.items():
+#     n = len(day_times)
+#     ncols = min(n, 3)
+#     nrows = int(np.ceil(n / ncols))
+#     fig, axes = plt.subplots(nrows, ncols, figsize=(4 * ncols, 5 * nrows),
+#                              sharex=True, sharey=True, squeeze=False)
+#     for ax, event_time in zip(axes.flat, day_times):
+#         scan = ds_merged.sel(time=pd.to_datetime(event_time), method='nearest')
+#         ax.plot(scan[z01_var], ds_merged['height'], color='blue', label='Z01')
+#         ax.plot(scan[z02_var], ds_merged['height'], color='red', label='Z02')
+#         #title shows the matched dataset time rounded to the nearest minute
+#         ax.set_title(pd.Timestamp(scan['time'].values).round('min').strftime('%H:%M UTC'))
+#         ax.grid(True, alpha=0.2, ls='--')
+#     for ax in axes.flat[n:]:
+#         ax.set_visible(False)
+#     for ax in axes[:, 0]:
+#         ax.set_ylabel('Height [m]')
+#     for ax in axes[-1, :]:
+#         ax.set_xlabel('Wind Speed [m/s]')
+#     axes[0, 0].legend()
+#     fig.suptitle(f'Wind Speed Profiles - {day_label}')
+#     fig.tight_layout()
+#     plt.show()
     #something doesn't look right so it might be worth to create the wind speed profiles with thte ddopler data. 
