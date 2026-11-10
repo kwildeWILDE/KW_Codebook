@@ -68,7 +68,9 @@ def mask_flat_runs(series, min_run=MIN_FLAT_RUN):
 desired_dates = (ds_m2['UTC_time'] >= '2026-02-01') & (ds_m2['UTC_time'] <= '2026-10-14')
 ds_m2_filtered = ds_m2.loc[desired_dates]
 
-
+# resample the M2 data to 10-minute intervals to match the Z02 data
+ds_m2_filtered = ds_m2_filtered.set_index('UTC_time')
+ds_m2_resampled = ds_m2_filtered.resample('10T').mean()
 #############################
 ##############################
 # Pulling the wind data from the WDH s40.lidars
@@ -273,12 +275,12 @@ for height, count in zip(valid_counts['distance'].values, valid_counts.values):
 #Make a linear regression plot for wind speed at different heights 
 #with the M2 and the Z02 datasets (in different colors) 
 # get the M2 wind speed data
-m2_ws_2 = ds_m2['Avg Wind Speed @ 2m [m/s]']
-m2_ws_5 = ds_m2['Avg Wind Speed @ 5m [m/s]']
-m2_ws_10 = ds_m2['Avg Wind Speed @ 10m [m/s]']
-m2_ws_20 = ds_m2['Avg Wind Speed @ 20m [m/s]']
-m2_ws_50 = ds_m2['Avg Wind Speed @ 50m [m/s]']
-m2_ws_80 = ds_m2['Avg Wind Speed @ 80m [m/s]']
+m2_ws_2 = ds_m2_resampled['Avg Wind Speed @ 2m [m/s]']
+m2_ws_5 = ds_m2_resampled['Avg Wind Speed @ 5m [m/s]']
+m2_ws_10 = ds_m2_resampled['Avg Wind Speed @ 10m [m/s]']
+m2_ws_20 = ds_m2_resampled['Avg Wind Speed @ 20m [m/s]']
+m2_ws_50 = ds_m2_resampled['Avg Wind Speed @ 50m [m/s]']
+m2_ws_80 = ds_m2_resampled['Avg Wind Speed @ 80m [m/s]']
 
 # get the z02 wind speed data at all of it avaible heights
 z02_ws_40 = ds_z02['wind_speed'].sel(distance=40).load()
