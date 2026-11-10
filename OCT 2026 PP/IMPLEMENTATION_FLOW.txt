@@ -1,0 +1,202 @@
+================================================================================
+                    OUTLIER HIGHLIGHTING IMPLEMENTATION FLOW
+================================================================================
+
+STEP 1: DATA EXTRACTION
+═══════════════════════════════════════════════════════════════════════════════
+    Dataset (M2 Jan 31 - Oct 17, 2026)
+         │
+         ├─→ Extract by Regime (Unstable/Stable based on Ri)
+         │
+         ├─→ Get Wind Speed @ 50m
+         │
+         └─→ Get Temperature @ 50m 
+                    │
+                    ↓
+           Valid Data Points (non-NaN)
+           Track original indices
+           
+           
+STEP 2: KDE COMPUTATION
+═══════════════════════════════════════════════════════════════════════════════
+    (wind_sp, temp) pairs
+         │
+         ├─→ Gaussian KDE 2D estimation
+         │
+         ├─→ Create grid (X, Y) mesh
+         │
+         └─→ Evaluate KDE on grid
+                    │
+                    ↓
+            Probability Density Surface (Z)
+            
+
+STEP 3: CONTOUR GENERATION
+═══════════════════════════════════════════════════════════════════════════════
+    Density Surface (Z)
+         │
+         ├─→ Generate 15 contour levels
+         │
+         ├─→ Filled contours (viridis colormap) ─→ Visual gradient
+         │
+         └─→ Outlined contours (white lines) ───→ Distribution boundaries
+                    │
+                    ↓
+            Contour Collection Object
+            ├─ allsegs[0] = Level 0 (highest density)
+            ├─ allsegs[1] = Level 1
+            ├─ ...
+            └─ allsegs[14] = Level 14 (lowest density) ← OUTERMOST
+
+
+STEP 4: OUTER CONTOUR EXTRACTION ✨ [THIS WAS THE BUG FIX]
+═══════════════════════════════════════════════════════════════════════════════
+    OLD (BROKEN) APPROACH:
+    ┌─────────────────────────────────────────┐
+    │ outer_contour = contours.collections[0] │  ❌ AttributeError!
+    │ outer_path = outer_contour.get_paths()  │
+    └─────────────────────────────────────────┘
+    
+    NEW (WORKING) APPROACH:
+    ┌──────────────────────────────────────────────┐
+    │ outer_segs = contours.allsegs[-1]            │  ✅ Correct!
+    │                                               │
+    │ for seg in outer_segs:                       │
+    │     verts = np.vstack([seg, seg[0]])         │
+    │     codes = [MOVETO] + [LINETO]*n + [CLOSE] │
+    │     Path(verts, codes)                       │
+    └──────────────────────────────────────────────┘
+    
+                    │
+                    ↓
+            Outermost Contour Path(s)
+            (elliptical boundary of distribution)
+
+
+STEP 5: OUTLIER DETECTION
+═══════════════════════════════════════════════════════════════════════════════
+    For each data point (wind_sp, temp):
+    
+    ┌─ Outside outermost contour? ────→ ✓ YES (Outlier)
+    │                                   ✗ NO  (Normal)
+    │
+    └─→ Check containment: path.contains_point([ws, t])
+                    │
+                    ↓
+        Boolean mask: is_outside_contour
+
+
+STEP 6: DATE FILTERING
+═══════════════════════════════════════════════════════════════════════════════
+    For each outlier point:
+    
+    ┌─ Extract timestamp ─→ Check date
+    │
+    ├─ Is it May 7, 2026?       ─→ ✓ YES  → HIGHLIGHT
+    │                            ✗ NO   → Skip
+    │
+    └─ Is it April 23, 2026?    ─→ ✓ YES  → HIGHLIGHT
+                                 ✗ NO   → Skip
+                    │
+                    ↓
+        Boolean mask: date_outlier_mask
+        (True only if outside AND from target dates)
+
+
+STEP 7: VISUALIZATION
+═══════════════════════════════════════════════════════════════════════════════
+    ax.scatter(wind_sp, temp)
+         │
+         ├─→ Plot 1: All points in GREEN
+         │         size=5, alpha=0.7, zorder=2
+         │
+         ├─→ Plot 2: Viridis contours and boundaries
+         │         White lines, zorder=3
+         │
+         ├─→ Plot 3: Outlier stars in RED (if any)
+         │         size=150, marker='*', zorder=4
+         │         Only points where date_outlier_mask=True
+         │
+         └─→ Legend (if red stars present)
+                    │
+                    ↓
+            Complete Visualization
+            ● GREEN dots: Normal points
+            ─ WHITE lines: KDE boundaries (15 levels)
+            ★ RED stars: May 7 & Apr 23 outliers
+
+
+STEP 8: OUTPUT
+═══════════════════════════════════════════════════════════════════════════════
+    Two side-by-side KDE plots:
+    
+    [Unstable Regime (Ri<0)]  |  [Stable Regime (Ri>0)]
+    
+    Each with:
+    ✓ Viridis density heatmap
+    ✓ White contour lines (15 levels)
+    ✓ Green point cloud (all data)
+    ✓ Red stars (target date outliers, if present)
+    ✓ Updated title with highlighting note
+    ✓ Legend (conditional)
+    ✓ Colorbar (density scale)
+
+
+ZORDER (Drawing Order - Higher = On Top)
+═══════════════════════════════════════════════════════════════════════════════
+    Layer 4: ★ RED STARS (outliers) ← Visible on top
+    Layer 3: ─ WHITE CONTOURS
+    Layer 2: ● GREEN DOTS
+    Layer 1: (Grid, axes)
+    Layer 0: (Background)
+
+
+KEY DATES FOR HIGHLIGHTING
+═══════════════════════════════════════════════════════════════════════════════
+    📅 May 7, 2026     → All outliers on this date highlighted
+    📅 April 23, 2026  → All outliers on this date highlighted
+
+
+EXPECTED VISUAL RESULT
+═══════════════════════════════════════════════════════════════════════════════
+    
+    IF outliers exist on target dates:
+    
+    ┌──────────────────────────────┐
+    │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │  Dense area (colormap)
+    │ ░░ ●●●●● ─────────────── ░░░░│  Green points, white contour
+    │ ░░ ●●●●● ★ ★ ─────────── ░░░░│  Red stars (May 7 outliers)
+    │ ░░●●●●●● ─────────────── ░░░░│  Outside boundary
+    │ ░░──────────────────────── ░░░░│  Outer contour ellipse
+    │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+    │ ★ Legend: Outliers (May 7 & Apr 23) │
+    └──────────────────────────────┘
+    
+    IF no outliers on target dates:
+    
+    ┌──────────────────────────────┐
+    │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │  Normal plot
+    │ ░░ ●●●●● ─────────────── ░░░░│  Just green dots
+    │ ░░ ●●●●● ─────────────── ░░░░│  No red stars
+    │ ░░●●●●●● ─────────────── ░░░░│
+    │ ░░──────────────────────── ░░░░│
+    │ ░░░░░░░░░░░░░░░░░░░░░░░░░░░░ │
+    │ (No legend)                    │
+    └──────────────────────────────┘
+
+
+SUMMARY
+═══════════════════════════════════════════════════════════════════════════════
+
+1. Data is loaded and organized by regime
+2. KDE is computed for each regime
+3. 15 contour levels are generated
+4. Outermost contour is extracted (using fixed API)
+5. Each point is tested against outer contour
+6. Outliers from May 7 & Apr 23 are identified
+7. Red stars highlight matching points
+8. Plot is rendered with all layers visible
+
+Result: Clear visual identification of specific outlier events in the data!
+
+═══════════════════════════════════════════════════════════════════════════════

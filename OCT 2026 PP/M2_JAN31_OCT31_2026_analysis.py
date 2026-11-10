@@ -11,6 +11,7 @@ from scipy.stats import alpha, gaussian_kde, norm, weibull_min, multivariate_nor
 import matplotlib.dates as mdates
 import matplotlib.colors as mcolors
 from matplotlib.patches import Ellipse, Patch
+from matplotlib.path import Path
 from windrose import WindroseAxes
 
 #############################################
@@ -177,72 +178,147 @@ temperature50_clean = mask_flat_runs(temp50)
 REGIMES = {'Ri (2-50m) < 0 (unstable)': (ri_250 < 0).to_numpy(),
            'Ri (2-50m) > 0 (stable)': (ri_250 > 0).to_numpy()}
 #bivariate KDE joint PDF with raw scatter between 50m wind speed and temperature for the whole period (Jan 31 - Oct 17), split by Ri sign
-# if True:
-#     fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
-#     for ax, (regime, regime_mask) in zip(axes, REGIMES.items()):
-#         mask = regime_mask
-#         wind_sp = wind_speed50_clean[mask].to_numpy()
-#         temp = temperature50_clean[mask].to_numpy()
-#         valid = ~(np.isnan(wind_sp) | np.isnan(temp))
-#         wind_sp, temp = wind_sp[valid], temp[valid]
-#         ax.set_xlabel('Wind Speed @ 50m [m/s]')
-#         ax.set_ylabel('Temperature @ 50m [deg C]')
-#         ax.grid(True, linestyle='--', alpha=0.5)
-#         if wind_sp.size < 3:
-#             ax.set_title(f'{regime} - insufficient data (n={wind_sp.size})')
-#             continue
+if True:
+    fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
+    for ax, (regime, regime_mask) in zip(axes, REGIMES.items()):
+        mask = regime_mask
+        wind_sp = wind_speed50_clean[mask].to_numpy()
+        temp = temperature50_clean[mask].to_numpy()
+        regime_indices = np.where(mask)[0]  # Get indices for this regime
+        valid = ~(np.isnan(wind_sp) | np.isnan(temp))
+        wind_sp, temp = wind_sp[valid], temp[valid]
+        valid_indices = regime_indices[valid]  # Get the actual indices of valid points
+        ax.set_xlabel('Wind Speed @ 50m [m/s]')
+        ax.set_ylabel('Temperature @ 50m [deg C]')
+        ax.grid(True, linestyle='--', alpha=0.5)
+        if wind_sp.size < 3:
+            ax.set_title(f'{regime} - insufficient data (n={wind_sp.size})')
+            continue
 
-#         kde = gaussian_kde(np.vstack([wind_sp, temp]))
-#         x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
-#         y = np.linspace(temp.min(), temp.max(), 100)
-#         X, Y = np.meshgrid(x, y)
-#         Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape)
+        kde = gaussian_kde(np.vstack([wind_sp, temp]))
+        x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
+        y = np.linspace(temp.min(), temp.max(), 100)
+        X, Y = np.meshgrid(x, y)
+        Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape)
 
-#         cf = ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
-#         ax.contour(X, Y, Z, levels=15, colors='w', linewidths=0.6, zorder=3)
-#         ax.scatter(wind_sp, temp, s=5, c='g', edgecolor='k', linewidth=0.3, alpha=0.7, zorder=2)
-#         fig.colorbar(cf, ax=ax, label='Joint PDF')
-#         ax.set_title(f'{regime} (n={wind_sp.size})')
+        cf = ax.contourf(X, Y, kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape), levels=15, cmap='viridis', alpha=0.7)
+        contours = ax.contour(X, Y, kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape), levels=15, colors='w', linewidths=0.6, zorder=3)
+        
+        # Get the outer contour paths (outermost level = lowest density level)
+        # Use allsegs to get contour line segments for the lowest level (index 0)
+        outer_paths = []
+        if len(contours.allsegs) > 0:
+            # The last index in allsegs corresponds to the outermost/lowest density contour
+            outer_segs = contours.allsegs[-1] if len(contours.allsegs) > 0 else []
+            if outer_segs:
+                # Convert segment arrays to matplotlib Path objects
+                for seg in outer_segs:
+                    if len(seg) > 2:  # Need at least 3 points to form a closed path
+                        # Create a closed path
+                        verts = np.vstack([seg, seg[0]])  # Close the path
+                        codes = [Path.MOVETO] + [Path.LINETO] * (len(verts) - 2) + [Path.CLOSEPOLY]
+                        outer_paths.append(Path(verts, codes))
+        
+        # Identify points outside outer contour by evaluating KDE at each point
+        date_outlier_mask = np.zeros(len(valid_indices), dtype=bool)
+        
+        # Evaluate KDE density at each point to identify those outside (low density)
+        if len(wind_sp) > 0:
+            point_densities = kde(np.vstack([wind_sp, temp]))
+            
+            # Find points with density below outer contour level
+            # Use the bottom ~10% as threshold which aligns with the outer contour boundary
+            density_threshold = np.percentile(point_densities, 10)  # Bottom 10% are outside the contour
+            
+            # Check each point
+            target_dates_list = [pd.Timestamp('2026-05-07').date(), pd.Timestamp('2026-04-23').date()]
+            
+            for point_idx, (ws, t, valid_idx) in enumerate(zip(wind_sp, temp, valid_indices)):
+                point_density = point_densities[point_idx]
+                point_date = time.iloc[valid_idx].date()
+                
+                # Check if point is outside contour (low density) AND from target date
+                if point_density < density_threshold and point_date in target_dates_list:
+                    date_outlier_mask[point_idx] = True
+        
+        # Plot all points in green
+        ax.scatter(wind_sp, temp, s=5, c='g', edgecolor='k', linewidth=0.3, alpha=0.7, zorder=2)
+        
+        # Highlight date-specific outliers in red
+        if np.any(date_outlier_mask):
+            ax.scatter(wind_sp[date_outlier_mask], temp[date_outlier_mask], 
+                      s=150, c='red', marker='*', edgecolor='darkred', linewidth=1.5, 
+                      alpha=0.9, zorder=4, label=f'Points outside contour (May 7 & Apr 23)')
+            ax.legend(loc='best', fontsize=9)
 
-#     fig.suptitle('M2 Wind Speed vs Temperature Bivariate KDE Joint PDF @ 50m - Jan 31 to Oct 17, 2026')
-#     plt.tight_layout()
-#     plt.show()
+    fig.suptitle('M2 Wind Speed vs Temperature Bivariate KDE Joint PDF @ 50m - Jan 31 to Oct 17, 2026\n(Red stars: Points outside outer contour on May 7 & Apr 23, 2026)')
+    plt.tight_layout()
+    plt.show()
 ############################################################################
 
 #do the same Bi-vibrate KDE joint month by month plots between 50m turbulence intensity and wind speed 
 turbi50 = ds_m2['Avg Turbulence Intensity @ 50m']
 turbi50_clean = turbi50.where(turbi50.notnull(), np.nan)
 
-# if True:
-#     fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
-#     for ax, (regime, regime_mask) in zip(axes, REGIMES.items()):
-#         mask = regime_mask
-#         wind_sp = wind_speed50_clean[mask].to_numpy()
-#         turbi = turbi50_clean[mask].to_numpy()
-#         valid = ~(np.isnan(wind_sp) | np.isnan(turbi))
-#         wind_sp, turbi = wind_sp[valid], turbi[valid]
-#         ax.set_xlabel('Wind Speed @ 50m [m/s]')
-#         ax.set_ylabel('Turbulence Intensity @ 50m')
-#         ax.grid(True, linestyle='--', alpha=0.5)
-#         if wind_sp.size < 3:
-#             ax.set_title(f'{regime} - insufficient data (n={wind_sp.size})')
-#             continue
+if True:
+    fig, axes = plt.subplots(1, 2, figsize=(16, 7), sharex=True, sharey=True)
+    for ax, (regime, regime_mask) in zip(axes, REGIMES.items()):
+        mask = regime_mask
+        wind_sp = wind_speed50_clean[mask].to_numpy()
+        turbi = turbi50_clean[mask].to_numpy()
+        regime_indices = np.where(mask)[0]  # Get indices for this regime
+        valid = ~(np.isnan(wind_sp) | np.isnan(turbi))
+        wind_sp, turbi = wind_sp[valid], turbi[valid]
+        valid_indices = regime_indices[valid]  # Get the actual indices of valid points
+        ax.set_xlabel('Wind Speed @ 50m [m/s]')
+        ax.set_ylabel('Turbulence Intensity @ 50m')
+        ax.grid(True, linestyle='--', alpha=0.5)
+        if wind_sp.size < 3:
+            ax.set_title(f'{regime} - insufficient data (n={wind_sp.size})')
+            continue
 
-#         kde = gaussian_kde(np.vstack([wind_sp, turbi]))
-#         x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
-#         y = np.linspace(turbi.min(), turbi.max(), 100)
-#         X, Y = np.meshgrid(x, y)
-#         Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape)
+        kde = gaussian_kde(np.vstack([wind_sp, turbi]))
+        x = np.linspace(wind_sp.min(), wind_sp.max(), 100)
+        y = np.linspace(turbi.min(), turbi.max(), 100)
+        X, Y = np.meshgrid(x, y)
+        Z = kde(np.vstack([X.ravel(), Y.ravel()])).reshape(X.shape)
+        cf = ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
+        contours = ax.contour(X, Y, Z, levels=15, colors='w', linewidths=0.6, zorder=3)
+        
+        # Identify points outside outer contour by evaluating KDE at each point
+        date_outlier_mask = np.zeros(len(valid_indices), dtype=bool)
+        
+        # Evaluate KDE density at each point to identify those outside (low density)
+        if len(wind_sp) > 0:
+            point_densities = kde(np.vstack([wind_sp, turbi]))
+            
+            # Find points with density in the lowest percentile (outside the outer contour)
+            density_threshold = np.percentile(point_densities, 10)  # Bottom 10% are likely outside
+            
+            # Check each point
+            target_dates_list = [pd.Timestamp('2026-05-07').date(), pd.Timestamp('2026-04-23').date()]
+            
+            for point_idx, (ws, t, valid_idx) in enumerate(zip(wind_sp, turbi, valid_indices)):
+                point_density = point_densities[point_idx]
+                point_date = time.iloc[valid_idx].date()
+                
+                # Check if point is outside contour (low density) AND from target date
+                if point_density < density_threshold and point_date in target_dates_list:
+                    date_outlier_mask[point_idx] = True
+        
+        # Plot all points in green
+        ax.scatter(wind_sp, turbi, s=5, c='g', edgecolor='k', linewidth=0.3, alpha=0.7, zorder=2)
+        
+        # Highlight date-specific outliers in red
+        if np.any(date_outlier_mask):
+            ax.scatter(wind_sp[date_outlier_mask], turbi[date_outlier_mask], 
+                      s=150, c='red', marker='*', edgecolor='darkred', linewidth=1.5, 
+                      alpha=0.9, zorder=4, label=f'Points outside contour (May 7 & Apr 23)')
+            ax.legend(loc='best', fontsize=9)
 
-#         cf = ax.contourf(X, Y, Z, levels=15, cmap='viridis', alpha=0.7)
-#         ax.contour(X, Y, Z, levels=15, colors='w', linewidths=0.6, zorder=3)
-#         ax.scatter(wind_sp, turbi, s=5, c='g', edgecolor='k', linewidth=0.3, alpha=0.7, zorder=2)
-#         fig.colorbar(cf, ax=ax, label='Joint PDF')
-#         ax.set_title(f'{regime} (n={wind_sp.size})')
-
-#     fig.suptitle('M2 Bivariate KDE Joint PDF @ 50m - Jan 31 to Oct 17, 2026 (Turbulence Intensity vs Wind Speed)')
-#     plt.tight_layout()
-#     plt.show()
+    fig.suptitle('M2 Bivariate KDE Joint PDF @ 50m - Jan 31 to Oct 17, 2026 (Turbulence Intensity vs Wind Speed)\n(Red stars: Points outside outer contour on May 7 & Apr 23, 2026)')
+    plt.tight_layout()
+    plt.show()
 #############################################
 ##
 # Now that we have bi-variate KDE plots for turbulence intensity vs wind speed and wind speed vs temperature,
