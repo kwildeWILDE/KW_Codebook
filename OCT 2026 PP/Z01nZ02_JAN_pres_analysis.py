@@ -29,8 +29,9 @@ if not nc_files_z01:
 #so concatenate along time, drop NaT/duplicate times, then sort.
 ds_z01 = xr.open_mfdataset(nc_files_z01, combine='nested', concat_dim='time',
                            data_vars='minimal', coords='minimal', compat='override')
-#keep only what the plot needs (WS, heights <= 500 m) and load it into memory once
-ds_z01 = ds_z01[['WS']].sel(height=slice(0, 500))
+# Keep the heights needed by both the standard and extended plots.
+max_height_extended = 2000  # m AGL
+ds_z01 = ds_z01[['WS']].sel(height=slice(0, max_height_extended))
 ds_z01 = ds_z01.isel(time=ds_z01['time'].notnull().values).sortby('time')
 ds_z01 = ds_z01.isel(time=~ds_z01.get_index('time').duplicated()).load()
 
@@ -71,8 +72,8 @@ print("Z02 30-min grid:", z02_30.sizes)
 #####################################
 ## if the time coordinates were not aligned initially, we have now aligned them to common times.
 # we can merge the Z01 and Z02 datasets along the time dimension
-#keep only times present in both datasets; heights are outer-joined so Z01 keeps its full
-#0-3000 m range (Z02 only covers 40-300 m and is NaN above that)
+#keep only times present in both datasets; heights are outer-joined so Z01 keeps its
+#0-2000 m range (Z02 only covers 40-300 m and is NaN above that)
 common_times = np.intersect1d(z01_30['time'].values, z02_30['time'].values)
 ds_merged = xr.merge([z01_30[['WS_z01']].sel(time=common_times),
                       z02_30.sel(time=common_times)], join='outer')
@@ -120,57 +121,38 @@ vmin = 3 # set minimum wind speed for color scale
 vmax = 10 # set maximum wind speed for color scale
 levels = np.linspace(vmin, vmax, 15)   #contourf ignores vmin/vmax unless levels are given
 
-#only plot months that have data
+# Pair the two height ranges for each month in a single figure.
+max_height_extended = 2000   #m AGL upper limit for extended plots
 ncols = min(6, len(months))
-nrows = int(np.ceil(len(months) / ncols))
-fig, axes = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3.5 * nrows),
-                         sharex=True, sharey=True, squeeze=False, layout='constrained')
-for ax in axes.flat[len(months):]:
-    ax.set_visible(False)
-for ax, month in zip(axes.flat, months):
-    ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
-    prof = ws_masked.sel(month=month).transpose('height', 'hour')
-    prof = prof.sel(height=slice(0, max_height))
-    hrs, hts = prof['hour'].values, prof['height'].values
-    # use contourf + contour to make it less pixelated
-    pcm = ax.contourf(hrs, hts, prof.values, levels=levels, cmap='viridis', extend='both')
-    ax.contour(hrs, hts, prof.values, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
-    ax.set_xticks([0, 6, 12, 18])
-    ax.set_ylim(0, max_height)
-for ax in axes[-1]:
-    ax.set_xlabel('Time (UTC)')
-for ax in axes[:, 0]:
-    ax.set_ylabel('Height (m AGL)')
-#colorbar and legend sit below the panels so they don't crowd the plots
+nmonth_rows = int(np.ceil(len(months) / ncols))
+fig, axes = plt.subplots(2 * nmonth_rows, ncols,
+                         figsize=(3 * ncols, 7 * nmonth_rows),
+                         sharex=True, sharey='row', squeeze=False, layout='constrained')
+for index in range(nmonth_rows * ncols):
+    row, col = divmod(index, ncols)
+    if index >= len(months):
+        axes[2 * row, col].set_visible(False)
+        axes[2 * row + 1, col].set_visible(False)
+        continue
+    month = months[index]
+    month_name = pd.Timestamp(2026, month, 1).strftime('%B')
+    for offset, height_limit in enumerate((max_height, max_height_extended)):
+        ax = axes[2 * row + offset, col]
+        ax.set_title(f'{month_name} (0-{height_limit} m)', fontsize=9, loc='left')
+        prof = ws_masked.sel(month=month, height=slice(0, height_limit)).transpose('height', 'hour')
+        hrs, hts = prof['hour'].values, prof['height'].values
+        pcm = ax.contourf(hrs, hts, prof.values, levels=levels, cmap='viridis', extend='both')
+        ax.contour(hrs, hts, prof.values, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
+        ax.set_xticks([0, 6, 12, 18])
+        ax.set_ylim(0, height_limit)
+        if col == 0:
+            ax.set_ylabel('Height (m AGL)')
+        if offset == 1:
+            ax.tick_params(labelbottom=True)
+            ax.set_xlabel('Time (UTC)')
 fig.colorbar(pcm, ax=axes, location='bottom', shrink=0.5, aspect=40, pad=0.03,
              label='Mean wind speed (m/s)')
 fig.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02', fontsize=10)
-plt.show()
-
-# MONTHLY DIURNAL CYCLE PANELS (Extended Height): color = mean wind speed (hour x height) up to 2000m
-max_height_extended = 2000   #m AGL upper limit for extended plots
-fig2, axes2 = plt.subplots(nrows, ncols, figsize=(3 * ncols, 3.5 * nrows),
-                          sharex=True, sharey=True, squeeze=False, layout='constrained')
-for ax in axes2.flat[len(months):]:
-    ax.set_visible(False)
-for ax, month in zip(axes2.flat, months):
-    ax.set_title(pd.Timestamp(2026, month, 1).strftime('%B'), fontsize=9, loc='left')
-    prof = ws_masked.sel(month=month).transpose('height', 'hour')
-    prof = prof.sel(height=slice(0, max_height_extended))
-    hrs, hts = prof['hour'].values, prof['height'].values
-    # use contourf + contour to make it less pixelated
-    pcm2 = ax.contourf(hrs, hts, prof.values, levels=levels, cmap='viridis', extend='both')
-    ax.contour(hrs, hts, prof.values, levels=levels, colors='k', linewidths=0.5, alpha=0.5)
-    ax.set_xticks([0, 6, 12, 18])
-    ax.set_ylim(0, max_height_extended)
-for ax in axes2[-1]:
-    ax.set_xlabel('Time (UTC)')
-for ax in axes2[:, 0]:
-    ax.set_ylabel('Height (m AGL)')
-#colorbar and legend sit below the panels so they don't crowd the plots
-fig2.colorbar(pcm2, ax=axes2, location='bottom', shrink=0.5, aspect=40, pad=0.03,
-             label='Mean wind speed (m/s)')
-fig2.suptitle('Monthly Diurnal Cycle of Mean Wind Speed from Combined lidar Z01 and Z02 (0-2000m)', fontsize=10)
 plt.show()
 
 ###################################################################################
