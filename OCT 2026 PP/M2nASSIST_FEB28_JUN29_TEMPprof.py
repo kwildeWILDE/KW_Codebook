@@ -133,43 +133,43 @@ m2_temp_by_height = {
 }
 
 # Pair each ASSIST sample with the nearest valid M2 sample within five minutes.
-MATCH_TOLERANCE = pd.Timedelta(minutes=5)
+MATCH_TOLERANCE = pd.Timedelta(minutes=10)
 
-# def match_on_utc(m2_series, at_series):
-#     m2_df = (pd.DataFrame({'UTC_time': ds_m2_filtered['UTC_time'], 'm2': m2_series})
-#              .dropna().drop_duplicates(subset='UTC_time').sort_values('UTC_time'))
-#     at_vals = at_series.load()
-#     at_df = (pd.DataFrame({'UTC_time': pd.to_datetime(at_vals['time'].values), 'at': at_vals.values})
-#              .dropna().drop_duplicates(subset='UTC_time').sort_values('UTC_time'))
-#     #the two time columns can have different datetime units (ns vs us), so cast both to ns
-#     m2_df['UTC_time'] = m2_df['UTC_time'].astype('datetime64[ns]')
-#     at_df['UTC_time'] = at_df['UTC_time'].astype('datetime64[ns]')
-#     merged = pd.merge_asof(at_df, m2_df, on='UTC_time', direction='nearest', tolerance=MATCH_TOLERANCE)
-#     return merged.dropna()
+def match_on_utc(m2_series, at_series):
+    m2_df = (pd.DataFrame({'UTC_time': ds_m2_filtered['UTC_time'], 'm2': m2_series})
+             .dropna().drop_duplicates(subset='UTC_time').sort_values('UTC_time'))
+    at_vals = at_series.load()
+    at_df = (pd.DataFrame({'UTC_time': pd.to_datetime(at_vals['time'].values), 'at': at_vals.values})
+             .dropna().drop_duplicates(subset='UTC_time').sort_values('UTC_time'))
+    #the two time columns can have different datetime units (ns vs us), so cast both to ns
+    m2_df['UTC_time'] = m2_df['UTC_time'].astype('datetime64[ns]')
+    at_df['UTC_time'] = at_df['UTC_time'].astype('datetime64[ns]')
+    merged = pd.merge_asof(at_df, m2_df, on='UTC_time', direction='nearest', tolerance=MATCH_TOLERANCE)
+    return merged.dropna()
 
-# fig, axes = plt.subplots(1, 2, figsize=(12, 6), squeeze=False)
-# for ax, (m2_height, m2_temp) in zip(axes[0], m2_temp_by_height.items()):
-#     at_temp = ds_at_filtered['temperature'].interp(height=m2_height / 1000, method='linear')
-#     at_height = float(at_temp['height'].values) * 1000
-#     matched = match_on_utc(m2_temp, at_temp)
-#     x, y = matched['m2'].values, matched['at'].values
-#     ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
-#     if x.size > 1 and np.ptp(x) > 0:
-#         slope, intercept, r, p, se = stats.linregress(x, y)
-#         xs = np.linspace(x.min(), x.max(), 200)
-#         ax.plot(xs, slope * xs + intercept, color='red', lw=2,
-#                 label=f'y = {slope:.3f}x + {intercept:.3f}\n$R^2$ = {r**2:.4f}, n = {x.size}')
-#         ax.legend(loc='upper left')
-#         print(f"M2 {m2_height}m vs ASSIST interpolated to {at_height:g}m: slope {slope:.4f}, intercept {intercept:.4f}, R2 {r**2:.4f}, n {x.size}")
-#     else:
-#         print(f"Cannot fit M2 {m2_height}m vs ASSIST {at_height:g}m: not enough distinct matched M2 temperatures (n = {x.size}).")
-#     ax.set_xlabel(f'M2 Temperature at {m2_height}m [deg C]')
-#     ax.set_ylabel(f'ASSIST Temperature at {at_height:g}m (interpolated) [deg C]')
-#     ax.set_title(f'M2 (10-min interval) {m2_height}m vs ASSIST {at_height:g}m', fontsize=10)
-#     ax.set_box_aspect(1)
-#     ax.grid(True, alpha=0.2, ls='--')
-# plt.tight_layout()
-# plt.show()
+fig, axes = plt.subplots(1, 2, figsize=(12, 6), squeeze=False)
+for ax, (m2_height, m2_temp) in zip(axes[0], m2_temp_by_height.items()):
+    at_temp = ds_at_filtered['temperature'].interp(height=m2_height / 1000, method='linear')
+    at_height = float(at_temp['height'].values) * 1000
+    matched = match_on_utc(m2_temp, at_temp)
+    x, y = matched['m2'].values, matched['at'].values
+    ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
+    if x.size > 1 and np.ptp(x) > 0:
+        slope, intercept, r, p, se = stats.linregress(x, y)
+        xs = np.linspace(x.min(), x.max(), 200)
+        ax.plot(xs, slope * xs + intercept, color='red', lw=2,
+                label=f'y = {slope:.3f}x + {intercept:.3f}\n$R^2$ = {r**2:.4f}, n = {x.size}')
+        ax.legend(loc='upper left')
+        print(f"M2 {m2_height}m vs ASSIST interpolated to {at_height:g}m: slope {slope:.4f}, intercept {intercept:.4f}, R2 {r**2:.4f}, n {x.size}")
+    else:
+        print(f"Cannot fit M2 {m2_height}m vs ASSIST {at_height:g}m: not enough distinct matched M2 temperatures (n = {x.size}).")
+    ax.set_xlabel(f'M2 Temperature at {m2_height}m [deg C]')
+    ax.set_ylabel(f'ASSIST Temperature at {at_height:g}m (interpolated) [deg C]')
+    ax.set_title(f'M2 (10-min interval) {m2_height}m vs ASSIST {at_height:g}m', fontsize=10)
+    ax.set_box_aspect(1)
+    ax.grid(True, alpha=0.2, ls='--')
+plt.tight_layout()
+plt.show()
 ####################################################################################
 #Now that we have the filtered M2 and ASSIST datasets, 
 #We can now create the necessary plots to find the agreement in tempature from both datasets
@@ -262,127 +262,127 @@ m2_months = ds_m2_filtered['UTC_time'].dt.month
 
 # PBL height is a time-only retrieval; use the time-quality filter, not the
 # height-dependent cloud mask that broadcasts it across all height levels.
-at_pblh = ds_at['pblh'].where((ds_at['rmsa'] <= 5) & (ds_at['gamma'] <= 3)).load()
-PBL_MAX_HEIGHT_KM = 5.0  # Exclude heights at or above 5 km from the diurnal mean.
-pbl_valid = np.isfinite(at_pblh) & (at_pblh >= 0) & (at_pblh < PBL_MAX_HEIGHT_KM)
-print(f"PBL quality-filtered observations excluded as negative or >= {PBL_MAX_HEIGHT_KM:g} km: "
-      f"{int((np.isfinite(at_pblh) & ~pbl_valid).sum().item())}; "
-      f"retained: {int(pbl_valid.sum().item())}")
-at_pblh = at_pblh.where(pbl_valid) * 1000  # km to m
-pbl_times = pd.to_datetime(at_pblh['time'].values)
-pbl_diurnal = pd.Series(
-    at_pblh.values,
-    index=pd.MultiIndex.from_arrays([pbl_times.month, pbl_times.hour], names=['month', 'hour']),
-).groupby(level=['month', 'hour']).mean()
+# at_pblh = ds_at['pblh'].where((ds_at['rmsa'] <= 5) & (ds_at['gamma'] <= 3)).load()
+# PBL_MAX_HEIGHT_KM = 5.0  # Exclude heights at or above 5 km from the diurnal mean.
+# pbl_valid = np.isfinite(at_pblh) & (at_pblh >= 0) & (at_pblh < PBL_MAX_HEIGHT_KM)
+# print(f"PBL quality-filtered observations excluded as negative or >= {PBL_MAX_HEIGHT_KM:g} km: "
+#       f"{int((np.isfinite(at_pblh) & ~pbl_valid).sum().item())}; "
+#       f"retained: {int(pbl_valid.sum().item())}")
+# at_pblh = at_pblh.where(pbl_valid) * 1000  # km to m
+# pbl_times = pd.to_datetime(at_pblh['time'].values)
+# pbl_diurnal = pd.Series(
+#     at_pblh.values,
+#     index=pd.MultiIndex.from_arrays([pbl_times.month, pbl_times.hour], names=['month', 'hour']),
+# ).groupby(level=['month', 'hour']).mean()
 
-at_temp_0_2000m = ds_at_filtered['temperature'].sel(height=slice(0, 2.0)).load()
-at_temp_0_2000m = at_temp_0_2000m.where((at_temp_0_2000m > -50) & (at_temp_0_2000m < 50))
-at_utc = pd.to_datetime(at_temp_0_2000m['time'].values)
-at_heights_2000m = at_temp_0_2000m['height'].values * 1000
-at_heights_m = at_temp_0_100m['height'].values * 1000
-hours = np.arange(24)
+# at_temp_0_2000m = ds_at_filtered['temperature'].sel(height=slice(0, 2.0)).load()
+# at_temp_0_2000m = at_temp_0_2000m.where((at_temp_0_2000m > -50) & (at_temp_0_2000m < 50))
+# at_utc = pd.to_datetime(at_temp_0_2000m['time'].values)
+# at_heights_2000m = at_temp_0_2000m['height'].values * 1000
+# at_heights_m = at_temp_0_100m['height'].values * 1000
+# hours = np.arange(24)
 
-at_diurnal_src = pd.DataFrame(
-    at_temp_0_2000m.values,
-    index=pd.MultiIndex.from_arrays([at_utc.month, at_utc.hour], names=['month', 'hour']),
-)
-at_diurnal_means = at_diurnal_src.groupby(level=['month', 'hour']).mean()
-at_diurnal_means = at_diurnal_means.reindex(pd.MultiIndex.from_product([months, hours], names=['month', 'hour']))
-at_diurnal_2000m = {
-    month: at_diurnal_means.loc[month].to_numpy() for month in months
-}
-at_diurnal = {
-    month: profile[:, at_heights_2000m <= 100] for month, profile in at_diurnal_2000m.items()
-}
+# at_diurnal_src = pd.DataFrame(
+#     at_temp_0_2000m.values,
+#     index=pd.MultiIndex.from_arrays([at_utc.month, at_utc.hour], names=['month', 'hour']),
+# )
+# at_diurnal_means = at_diurnal_src.groupby(level=['month', 'hour']).mean()
+# at_diurnal_means = at_diurnal_means.reindex(pd.MultiIndex.from_product([months, hours], names=['month', 'hour']))
+# at_diurnal_2000m = {
+#     month: at_diurnal_means.loc[month].to_numpy() for month in months
+# }
+# at_diurnal = {
+#     month: profile[:, at_heights_2000m <= 100] for month, profile in at_diurnal_2000m.items()
+# }
 
-m2_utc = ds_m2_filtered['UTC_time']
-m2_diurnal_src = pd.DataFrame({
-    'month': m2_utc.dt.month,
-    'hour': m2_utc.dt.hour,
-    2: ds_m2_filtered["Temperature @ 2m [deg C]"],
-    50: ds_m2_filtered["Temperature @ 50m [deg C]"],
-})
-m2_diurnal = m2_diurnal_src.groupby(['month', 'hour']).mean()
+# m2_utc = ds_m2_filtered['UTC_time']
+# m2_diurnal_src = pd.DataFrame({
+#     'month': m2_utc.dt.month,
+#     'hour': m2_utc.dt.hour,
+#     2: ds_m2_filtered["Temperature @ 2m [deg C]"],
+#     50: ds_m2_filtered["Temperature @ 50m [deg C]"],
+# })
+# m2_diurnal = m2_diurnal_src.groupby(['month', 'hour']).mean()
 
-month_names = {2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July'}
+# month_names = {2: 'February', 3: 'March', 4: 'April', 5: 'May', 6: 'June', 7: 'July'}
 
-# One shared color scale for both height ranges, all months, and the M2 points.
-plot_values = np.concatenate(
-    [profile.ravel() for profile in at_diurnal_2000m.values()]
-    + [m2_diurnal.loc[m2_diurnal.index.get_level_values('month').isin(months), [2, 50]].to_numpy().ravel()]
-)
-plot_values = plot_values[np.isfinite(plot_values)]
-if plot_values.size == 0:
-    raise ValueError("No valid M2 or ASSIST temperatures are available for the diurnal plots.")
-vmin, vmax = plot_values.min(), plot_values.max()
-if vmin == vmax:
-    vmin, vmax = vmin - 0.5, vmax + 0.5
-temperature_norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
-temperature_cmap = 'RdYlBu_r'
-contour_levels = plt.MaxNLocator(nbins=8).tick_values(vmin, vmax)
+# # One shared color scale for both height ranges, all months, and the M2 points.
+# plot_values = np.concatenate(
+#     [profile.ravel() for profile in at_diurnal_2000m.values()]
+#     + [m2_diurnal.loc[m2_diurnal.index.get_level_values('month').isin(months), [2, 50]].to_numpy().ravel()]
+# )
+# plot_values = plot_values[np.isfinite(plot_values)]
+# if plot_values.size == 0:
+#     raise ValueError("No valid M2 or ASSIST temperatures are available for the diurnal plots.")
+# vmin, vmax = plot_values.min(), plot_values.max()
+# if vmin == vmax:
+#     vmin, vmax = vmin - 0.5, vmax + 0.5
+# temperature_norm = mcolors.Normalize(vmin=vmin, vmax=vmax)
+# temperature_cmap = 'RdYlBu_r'
+# contour_levels = plt.MaxNLocator(nbins=8).tick_values(vmin, vmax)
 
-def smooth_contour_profile(profile):
-    # Retain missing cells and wrap the diurnal hour when smoothing for display.
-    valid = np.isfinite(profile)
-    weights = gaussian_filter(valid.astype(float), sigma=(1, 0.75), mode=('wrap', 'nearest'))
-    total = gaussian_filter(np.where(valid, profile, 0.0), sigma=(1, 0.75), mode=('wrap', 'nearest'))
-    smoothed = np.full(profile.shape, np.nan)
-    np.divide(total, weights, out=smoothed, where=valid & (weights > 0))
-    return smoothed
+# def smooth_contour_profile(profile):
+#     # Retain missing cells and wrap the diurnal hour when smoothing for display.
+#     valid = np.isfinite(profile)
+#     weights = gaussian_filter(valid.astype(float), sigma=(1, 0.75), mode=('wrap', 'nearest'))
+#     total = gaussian_filter(np.where(valid, profile, 0.0), sigma=(1, 0.75), mode=('wrap', 'nearest'))
+#     smoothed = np.full(profile.shape, np.nan)
+#     np.divide(total, weights, out=smoothed, where=valid & (weights > 0))
+#     return smoothed
 
-fig, axes = plt.subplots(2, len(months), figsize=(4.3 * len(months), 10.5), sharex=True, constrained_layout=True)
-fig.get_layout_engine().set(w_pad=0.1, h_pad=0.15, wspace=0.06, hspace=0.12)
-for row, (heights, profiles, max_height) in enumerate([
-    (at_heights_m, at_diurnal, 100),
-    (at_heights_2000m, at_diurnal_2000m, 2000),
-]):
-    hour_edges = np.linspace(-0.5, 23.5, 97)
-    height_edges = np.linspace(heights[0], heights[-1], 161)
-    hour_centers = (hour_edges[:-1] + hour_edges[1:]) / 2
-    height_centers = (height_edges[:-1] + height_edges[1:]) / 2
-    hour_grid, height_grid = np.meshgrid(hour_centers, height_centers, indexing='ij')
-    for ax, month in zip(axes[row], months):
-        contour_profile = smooth_contour_profile(profiles[month])
-        # Interpolate for display only, without filling missing values or extending beyond observed heights.
-        cyclic_profile = np.concatenate((contour_profile[-1:], contour_profile, contour_profile[:1]), axis=0)
-        interpolate = RegularGridInterpolator((np.arange(-1, 25), heights), cyclic_profile)
-        heatmap_profile = interpolate((hour_grid, height_grid))
-        heatmap = ax.pcolormesh(
-            hour_edges, height_edges, heatmap_profile.T,
-            cmap=temperature_cmap, norm=temperature_norm, shading='flat',
-        )
-        if np.isfinite(contour_profile).any():
-            contours = ax.contour(
-                hours, heights, contour_profile.T, levels=contour_levels,
-                colors='black', linewidths=0.6, zorder=2,
-            )
-            ax.clabel(contours, inline=True, fontsize=7, fmt='%g')
+# fig, axes = plt.subplots(2, len(months), figsize=(4.3 * len(months), 10.5), sharex=True, constrained_layout=True)
+# fig.get_layout_engine().set(w_pad=0.1, h_pad=0.15, wspace=0.06, hspace=0.12)
+# for row, (heights, profiles, max_height) in enumerate([
+#     (at_heights_m, at_diurnal, 100),
+#     (at_heights_2000m, at_diurnal_2000m, 2000),
+# ]):
+#     hour_edges = np.linspace(-0.5, 23.5, 97)
+#     height_edges = np.linspace(heights[0], heights[-1], 161)
+#     hour_centers = (hour_edges[:-1] + hour_edges[1:]) / 2
+#     height_centers = (height_edges[:-1] + height_edges[1:]) / 2
+#     hour_grid, height_grid = np.meshgrid(hour_centers, height_centers, indexing='ij')
+#     for ax, month in zip(axes[row], months):
+#         contour_profile = smooth_contour_profile(profiles[month])
+#         # Interpolate for display only, without filling missing values or extending beyond observed heights.
+#         cyclic_profile = np.concatenate((contour_profile[-1:], contour_profile, contour_profile[:1]), axis=0)
+#         interpolate = RegularGridInterpolator((np.arange(-1, 25), heights), cyclic_profile)
+#         heatmap_profile = interpolate((hour_grid, height_grid))
+#         heatmap = ax.pcolormesh(
+#             hour_edges, height_edges, heatmap_profile.T,
+#             cmap=temperature_cmap, norm=temperature_norm, shading='flat',
+#         )
+#         if np.isfinite(contour_profile).any():
+#             contours = ax.contour(
+#                 hours, heights, contour_profile.T, levels=contour_levels,
+#                 colors='black', linewidths=0.6, zorder=2,
+#             )
+#             ax.clabel(contours, inline=True, fontsize=7, fmt='%g')
 
-        for m2_h in (2, 50):
-            if month in m2_diurnal.index.get_level_values('month'):
-                m2_m = m2_diurnal.loc[month][m2_h].dropna()
-                ax.scatter(m2_m.index, np.full(len(m2_m), m2_h), c=m2_m.values,
-                           cmap=temperature_cmap, norm=temperature_norm, s=45,
-                           edgecolors=height_colors[m2_h], linewidths=1.2, zorder=3)
-            ax.axhline(m2_h, color=height_colors[m2_h], lw=0.6, ls=':')
+#         for m2_h in (2, 50):
+#             if month in m2_diurnal.index.get_level_values('month'):
+#                 m2_m = m2_diurnal.loc[month][m2_h].dropna()
+#                 ax.scatter(m2_m.index, np.full(len(m2_m), m2_h), c=m2_m.values,
+#                            cmap=temperature_cmap, norm=temperature_norm, s=45,
+#                            edgecolors=height_colors[m2_h], linewidths=1.2, zorder=3)
+#             ax.axhline(m2_h, color=height_colors[m2_h], lw=0.6, ls=':')
 
-        if month in pbl_diurnal.index.get_level_values('month'):
-            pbl_month = pbl_diurnal.loc[month].reindex(hours)
-            ax.plot(hours, pbl_month.values, color='black', linewidth=2.8, zorder=4)
-            ax.plot(hours, pbl_month.values, color='white', linewidth=1.3, zorder=5)
+#         if month in pbl_diurnal.index.get_level_values('month'):
+#             pbl_month = pbl_diurnal.loc[month].reindex(hours)
+#             ax.plot(hours, pbl_month.values, color='black', linewidth=2.8, zorder=4)
+#             ax.plot(hours, pbl_month.values, color='white', linewidth=1.3, zorder=5)
 
-        ax.set_title(f'{month_names[month]} (0-{max_height} m)', pad=10)
-        ax.set_xlim(-0.5, 23.5)
-        ax.set_ylim(0, max_height)
-        ax.set_xticks([0, 6, 12, 18])
-        ax.set_xlabel('Time (UTC)', labelpad=8)
-        ax.grid(True, alpha=0.2, ls='--')
-    axes[row, 0].set_ylabel('Height [m]', labelpad=8)
-fig.colorbar(heatmap, ax=axes, pad=0.02, label='Temperature [deg C] (ASSIST heat map and M2 points)')
-fig.supxlabel('M2 circles: cyan outline = 2 m, tomato outline = 50 m; fill color = temperature\n'
-              'White line with black outline = monthly hourly mean PBL height', fontsize=9)
-fig.suptitle('UTC diurnal mean temperature: ASSIST heat map and smoothed contours with M2 points', fontsize=14)
-plt.show()
+#         ax.set_title(f'{month_names[month]} (0-{max_height} m)', pad=10)
+#         ax.set_xlim(-0.5, 23.5)
+#         ax.set_ylim(0, max_height)
+#         ax.set_xticks([0, 6, 12, 18])
+#         ax.set_xlabel('Time (UTC)', labelpad=8)
+#         ax.grid(True, alpha=0.2, ls='--')
+#     axes[row, 0].set_ylabel('Height [m]', labelpad=8)
+# fig.colorbar(heatmap, ax=axes, pad=0.02, label='Temperature [deg C] (ASSIST heat map and M2 points)')
+# fig.supxlabel('M2 circles: cyan outline = 2 m, tomato outline = 50 m; fill color = temperature\n'
+#               'White line with black outline = monthly hourly mean PBL height', fontsize=9)
+# fig.suptitle('UTC diurnal mean temperature: ASSIST heat map and smoothed contours with M2 points', fontsize=14)
+# plt.show()
 
 # #numeric agreement (ASSIST nearest level minus M2) per month, averaged over the diurnal cycle
 # for month in months:
