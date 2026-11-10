@@ -70,7 +70,7 @@ ds_m2_filtered = ds_m2.loc[desired_dates]
 
 # resample the M2 data to 10-minute intervals to match the Z02 data
 ds_m2_filtered = ds_m2_filtered.set_index('UTC_time')
-ds_m2_resampled = ds_m2_filtered.resample('10T').mean()
+ds_m2_resampled = ds_m2_filtered.select_dtypes(include=[np.number]).resample('10 min').mean()
 #############################
 ##############################
 # Pulling the wind data from the WDH s40.lidars
@@ -93,6 +93,7 @@ ds_z02 = ds_z02.isel(time=~ds_z02.get_index('time').duplicated())
 
 print("Successfully loaded S40 LIDAR Z02 C0 data.")
 print(ds_z02.head(10))
+ds_z02_all = ds_z02  # retain all Z02 times for alignment with resampled M2
 
 
 ##############################################################
@@ -180,16 +181,16 @@ hist_months = [m for m in hist_months if 2 <= m <= 9]
 #creating the frequency histogram for the entire peiod (FEB-OCT 2026) between the
 wind_speed_all = m2_all_50m[m2_50m_col].dropna()
 wind_speed_all = wind_speed_all[wind_speed_all > 0]
-plt.figure(figsize=(10, 6))
-plt.hist(wind_speed_all, bins=20, density=True, alpha=0.6, color='g', label='M2 50m Wind Speed Frequency')
-params = stats.weibull_min.fit(wind_speed_all, floc=0)
-x = np.linspace(0, wind_speed_all.max(), 100)
-plt.plot(x, stats.weibull_min.pdf(x, *params), 'r-', lw=2, label='Weibull Fit')
-plt.title('M2 Wind Speed at 50m - Feb to Oct 2026')
-plt.xlabel('Wind Speed [m/s]')
-plt.ylabel('Frequency')
-plt.legend()
-plt.show()
+# plt.figure(figsize=(10, 6))
+# plt.hist(wind_speed_all, bins=20, density=True, alpha=0.6, color='g', label='M2 50m Wind Speed Frequency')
+# params = stats.weibull_min.fit(wind_speed_all, floc=0)
+# x = np.linspace(0, wind_speed_all.max(), 100)
+# plt.plot(x, stats.weibull_min.pdf(x, *params), 'r-', lw=2, label='Weibull Fit')
+# plt.title('M2 Wind Speed at 50m - Feb to Oct 2026')
+# plt.xlabel('Wind Speed [m/s]')
+# plt.ylabel('Frequency')
+# plt.legend()
+# plt.show()
 
 
 # for month in hist_months:
@@ -272,59 +273,37 @@ for height, count in zip(valid_counts['distance'].values, valid_counts.values):
     # print(f"Height: {height}, Number of wind speed measurements: {count}")
 
 ###########################################################
-#Make a linear regression plot for wind speed at different heights 
-#with the M2 and the Z02 datasets (in different colors) 
-# get the M2 wind speed data
-m2_ws_2 = ds_m2_resampled['Avg Wind Speed @ 2m [m/s]']
-m2_ws_5 = ds_m2_resampled['Avg Wind Speed @ 5m [m/s]']
-m2_ws_10 = ds_m2_resampled['Avg Wind Speed @ 10m [m/s]']
-m2_ws_20 = ds_m2_resampled['Avg Wind Speed @ 20m [m/s]']
-m2_ws_50 = ds_m2_resampled['Avg Wind Speed @ 50m [m/s]']
-m2_ws_80 = ds_m2_resampled['Avg Wind Speed @ 80m [m/s]']
+# Make a linear regression plot for M2 and Z02 wind speeds at 80 m.
+# Pair the 10-minute averages with Z02 by UTC time, independently of the
+# one-minute M2 alignment used by the earlier plots.
+regression_time = np.intersect1d(ds_m2_resampled.index.values, ds_z02_all['time'].values)
+if regression_time.size == 0:
+    raise ValueError("No common timestamps between resampled M2 and Z02 for regression.")
+ds_m2_regression = ds_m2_resampled.loc[regression_time]
+ds_z02_regression = ds_z02_all.sel(time=regression_time)
 
-# get the z02 wind speed data at all of it avaible heights
-z02_ws_40 = ds_z02['wind_speed'].sel(distance=40).load()
-z02_ws_60 = ds_z02['wind_speed'].sel(distance=60).load()
-z02_ws_80 = ds_z02['wind_speed'].sel(distance=80).load()
-z02_ws_100 = ds_z02['wind_speed'].sel(distance=100).load()
-z02_ws_120 = ds_z02['wind_speed'].sel(distance=120).load()
-z02_ws_140 = ds_z02['wind_speed'].sel(distance=140).load()
-z02_ws_160 = ds_z02['wind_speed'].sel(distance=160).load()
-z02_ws_180 = ds_z02['wind_speed'].sel(distance=180).load()
-z02_ws_200 = ds_z02['wind_speed'].sel(distance=200).load()
-z02_ws_220 = ds_z02['wind_speed'].sel(distance=220).load()
-z02_ws_240 = ds_z02['wind_speed'].sel(distance=240).load()
-z02_ws_260 = ds_z02['wind_speed'].sel(distance=260).load()
-z02_ws_280 = ds_z02['wind_speed'].sel(distance=280).load()
-z02_ws_300 = ds_z02['wind_speed'].sel(distance=300).load()
+m2_ws_80 = ds_m2_regression['Avg Wind Speed @ 80m [m/s]']
+z02_ws_80 = ds_z02_regression['wind_speed'].sel(distance=80).load()
 
-######################################################## 
-# Now you can proceed to create linear regression plots for the wind speed at different heights
-# using the M2 and Z02 datasets.
-m2_ws_by_height = {20: m2_ws_20, 50: m2_ws_50, 80: m2_ws_80}
-z02_ws_by_height = {40: z02_ws_40, 60: z02_ws_60, 80: z02_ws_80}
+# Both regression datasets now have the same UTC times in the same order.
+x = np.asarray(m2_ws_80, dtype=float).ravel()
+y = np.asarray(z02_ws_80, dtype=float).ravel()
+keep = np.isfinite(x) & np.isfinite(y) & (x > 0) & (y > 0)
+x, y = x[keep], y[keep]
 
-# closest-height pairs (M2 height, Z02 height)
-height_pairs = [(20, 40), (50, 40), (50, 60), (80, 80)]
-
-# ds_m2 and ds_z02 were aligned on the same UTC times, so the samples pair up positionally
-fig, axes = plt.subplots(2, 2, figsize=(12, 10))
-for ax, (m2_h, z02_h_sel) in zip(axes.ravel(), height_pairs):
-    x = np.asarray(m2_ws_by_height[m2_h], dtype=float).ravel()
-    y = np.asarray(z02_ws_by_height[z02_h_sel], dtype=float).ravel()
-    keep = np.isfinite(x) & np.isfinite(y) & (x > 0) & (y > 0)
-    x, y = x[keep], y[keep]
-
-    slope, intercept, r, p, se = stats.linregress(x, y)
-    xs = np.linspace(x.min(), x.max(), 200)
-    ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
-    ax.plot(xs, slope * xs + intercept, color='red', lw=2,
-            label=f'y = {slope:.2f}x + {intercept:.2f}\n$R^2$ = {r**2:.3f}, n = {x.size}')
-    ax.set_xlabel(f'M2 Wind Speed at {m2_h}m (m/s)')
-    ax.set_ylabel(f'Z02 Wind Speed at {z02_h_sel}m (m/s)')
-    ax.set_title(f'M2 {m2_h}m vs Z02 {z02_h_sel}m')
-    ax.grid(True, alpha=0.2, ls='--')
-    ax.legend(loc='upper left')
+if x.size < 2 or np.all(x == x[0]):
+    raise ValueError("Not enough valid, varying wind speeds for M2 80m and Z02 80m regression.")
+slope, intercept, r, p, se = stats.linregress(x, y)
+xs = np.linspace(x.min(), x.max(), 200)
+fig, ax = plt.subplots(figsize=(10, 6))
+ax.scatter(x, y, s=5, alpha=0.3, color='steelblue')
+ax.plot(xs, slope * xs + intercept, color='red', lw=2,
+        label=f'y = {slope:.2f}x + {intercept:.2f}\n$R^2$ = {r**2:.3f}, n = {x.size}')
+ax.set_xlabel('M2 Wind Speed at 80m (m/s)')
+ax.set_ylabel('Z02 Wind Speed at 80m (m/s)')
+ax.set_title('M2 80m vs Z02 80m')
+ax.grid(True, alpha=0.2, ls='--')
+ax.legend(loc='upper left')
 plt.tight_layout()
 plt.show()
 
