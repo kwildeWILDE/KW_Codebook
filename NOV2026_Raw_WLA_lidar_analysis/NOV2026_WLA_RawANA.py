@@ -71,6 +71,74 @@ times_wls73 = pd.to_datetime(
     [os.path.basename(path).split('_', 1)[1] for path in all_sta_files_wls73],
     format='%Y_%m_%d__%H_%M_%S.sta',
 )
+
+def get_measurement_availability(sta_files, lidar):
+    if not sta_files:
+        raise ValueError(f"No .sta files found for {lidar}")
+
+    frames = []
+    for file_path in sta_files:
+        with open(file_path, 'r', encoding='utf-8-sig') as f:
+            for line in f:
+                if line.startswith('Timestamp (end of interval)'):
+                    header = line.rstrip('\r\n').split('\t')
+                    break
+            else:
+                raise ValueError(f"Measurement header not found in {file_path}")
+
+            speed_columns = {}
+            for i, column in enumerate(header):
+                match = re.fullmatch(r'(\d+)m Wind Speed \(m/s\)', column)
+                if match:
+                    speed_columns[int(match.group(1))] = i
+            if not speed_columns:
+                raise ValueError(f"No wind speed columns found in {file_path}")
+            heights = sorted(speed_columns)
+            availability_columns = []
+            for height in heights:
+                column = f'{height}m Data Availability (%)'
+                if column not in header:
+                    raise ValueError(f"Missing {column} in {file_path}")
+                availability_columns.append(header.index(column))
+            speed_indices = [speed_columns[height] for height in heights]
+            data = pd.read_csv(
+                f, sep='\t', header=None, names=range(len(header)),
+                usecols=[0] + speed_indices + availability_columns,
+            )
+
+        measurement_times = pd.to_datetime(data[0], format='%Y/%m/%d %H:%M', errors='raise')
+        if measurement_times.isna().any():
+            raise ValueError(f"Missing measurement timestamp in {file_path}")
+        speeds = data[speed_indices].apply(pd.to_numeric, errors='raise').to_numpy()
+        availability = data[availability_columns].apply(pd.to_numeric, errors='raise').to_numpy()
+        available = np.isfinite(speeds) & np.isfinite(availability) & (availability > 0)
+        frame = pd.DataFrame(available, columns=heights)
+        frame.insert(0, 'Timestamp', measurement_times)
+        frames.append(frame.melt(id_vars='Timestamp', var_name='Height_m', value_name=lidar))
+
+    result = pd.concat(frames, ignore_index=True)
+    if result.duplicated(['Timestamp', 'Height_m']).any():
+        raise ValueError(f"Duplicate measurement timestamp and height for {lidar}")
+    return result
+
+
+availability_wls71 = get_measurement_availability(all_sta_files_wls71, 'WLS71460')
+availability_wls73 = get_measurement_availability(all_sta_files_wls73, 'WLS73514')
+measurement_availability = availability_wls71.merge(
+    availability_wls73, on=['Timestamp', 'Height_m'], how='outer',
+).sort_values(['Timestamp', 'Height_m'])
+
+summary = pd.DataFrame({'Height_m': sorted(measurement_availability['Height_m'].unique())})
+for lidar in ['WLS71460', 'WLS73514']:
+    counts = measurement_availability.groupby('Height_m')[lidar].agg(['sum', 'count'])
+    counts.columns = [f'{lidar}_available', f'{lidar}_recorded']
+    summary = summary.merge(counts, on='Height_m', how='left')
+
+output_dir = os.path.dirname(os.path.abspath(__file__))
+measurement_availability.to_csv(os.path.join(output_dir, 'lidar_measurement_availability.csv'), index=False)
+summary.to_csv(os.path.join(output_dir, 'lidar_availability_by_height.csv'), index=False)
+print("Saved measurement availability and counts by height to", output_dir)
+
 fig, ax = plt.subplots(figsize=(10, 6))
 ax.plot(times_wls71, [1]*len(times_wls71), 'bo', label='WLS71460')
 ax.plot(times_wls73, [2]*len(times_wls73), 'ro', label='WLS73514')
@@ -126,23 +194,23 @@ print("Configured heights above ground (m) for WLS71460 lidar:", heights_wls71)
 print("Configured heights above ground (m) for WLS73514 lidar:", heights_wls73)
 
 ####################################################################################
-# Plot file timestamps against configured measurement heights.
-fig, ax = plt.subplots(figsize=(10, 6))
-for i, height in enumerate(heights_wls71):
-    ax.plot(times_wls71, [height]*len(times_wls71), 'bo', markersize=5,
-            label='WLS71460' if i == 0 else None)
-for i, height in enumerate(heights_wls73):
-    ax.plot(times_wls73, [height]*len(times_wls73), 'rx', markersize=4,
-            label='WLS73514' if i == 0 else None)
-ax.xaxis.set_major_locator(mdates.AutoDateLocator())
-ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-ax.set_yticks(range(40, 401, 20))
-ax.set_ylim(30, 410)
+# Plot available wind-speed measurements at their actual timestamps and heights.
+fig, axes = plt.subplots(2, 1, figsize=(12, 9), sharex=True, sharey=True)
+for ax, data, lidar, color in [
+    (axes[0], availability_wls71, 'WLS71460', 'blue'),
+    (axes[1], availability_wls73, 'WLS73514', 'red'),
+]:
+    available = data.loc[data[lidar]]
+    ax.scatter(available['Timestamp'], available['Height_m'], color=color, s=1, rasterized=True)
+    ax.set_title(lidar)
+    ax.set_ylabel('Height above ground (m)')
+    ax.set_yticks(sorted(set(heights_wls71) | set(heights_wls73)))
+    ax.set_ylim(30, 410)
+    ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.4)
+axes[-1].xaxis.set_major_locator(mdates.AutoDateLocator())
+axes[-1].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+axes[-1].set_xlabel('Measurement date')
+fig.suptitle('Available Wind-Speed Measurements by Height')
 fig.autofmt_xdate()
-plt.xlabel('Date')
-plt.ylabel('Height above ground (m)')
-plt.title('Configured Heights at File Timestamps for WLS71460 and WLS73514')
-plt.legend()
-plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.4)
 plt.tight_layout()
 plt.show()
