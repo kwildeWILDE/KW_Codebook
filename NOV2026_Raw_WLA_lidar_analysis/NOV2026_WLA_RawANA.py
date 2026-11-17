@@ -87,10 +87,62 @@ plt.show()
 
 # Align file timestamps and indicate whether each lidar has a file at that timestamp.
 timestamps = times_wls71.union(times_wls73).unique().sort_values()
-df_all = pd.DataFrame({
-    'Timestamp': timestamps,
-    'WLS71460': timestamps.isin(times_wls71),
-    'WLS73514': timestamps.isin(times_wls73),
-})
-df_all.to_csv('lidar_data_availability.csv', index=False)
-print("Lidar data availability saved to 'lidar_data_availability.csv'")
+# df_all = pd.DataFrame({
+#     'Timestamp': timestamps,
+#     'WLS71460': timestamps.isin(times_wls71),
+#     'WLS73514': timestamps.isin(times_wls73),
+# })
+# df_all.to_csv('lidar_data_availability.csv', index=False)
+# print("Lidar data availability saved to 'lidar_data_availability.csv'")
+
+##########################################################################################
+# see if we can make another plot that shows the overall time availability for the data and the different heights of the lidar measurements
+# first see what heights are available in the .sta files for each lidar system
+def get_heights_from_sta_files(sta_files):
+    if not sta_files:
+        raise ValueError("No .sta files were found to extract heights from.")
+
+    heights = set()
+    for file_path in sta_files:
+        with open(file_path, 'r', encoding='utf-8-sig') as f:
+            for line in f:
+                if line.startswith('Altitudes AGL (m)='):
+                    values = line.split('=', 1)[1].split()
+                    if not values:
+                        raise ValueError(f"No altitudes found in {file_path}")
+                    try:
+                        heights.update(float(value) for value in values)
+                    except ValueError as exc:
+                        raise ValueError(f"Invalid altitude in {file_path}") from exc
+                    break
+            else:
+                raise ValueError(f"Altitude header not found in {file_path}")
+    return sorted(heights)
+
+heights_wls71 = get_heights_from_sta_files(all_sta_files_wls71)
+heights_wls73 = get_heights_from_sta_files(all_sta_files_wls73)
+
+print("Configured heights above ground (m) for WLS71460 lidar:", heights_wls71)
+print("Configured heights above ground (m) for WLS73514 lidar:", heights_wls73)
+
+####################################################################################
+# Plot file timestamps against configured measurement heights.
+fig, ax = plt.subplots(figsize=(10, 6))
+for i, height in enumerate(heights_wls71):
+    ax.plot(times_wls71, [height]*len(times_wls71), 'bo', markersize=5,
+            label='WLS71460' if i == 0 else None)
+for i, height in enumerate(heights_wls73):
+    ax.plot(times_wls73, [height]*len(times_wls73), 'rx', markersize=4,
+            label='WLS73514' if i == 0 else None)
+ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
+ax.set_yticks(range(40, 401, 20))
+ax.set_ylim(30, 410)
+fig.autofmt_xdate()
+plt.xlabel('Date')
+plt.ylabel('Height above ground (m)')
+plt.title('Configured Heights at File Timestamps for WLS71460 and WLS73514')
+plt.legend()
+plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.4)
+plt.tight_layout()
+plt.show()
