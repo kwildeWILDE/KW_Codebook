@@ -85,12 +85,12 @@ plt.grid(True, which='both', linestyle='--', linewidth=0.5, alpha=0.4)
 plt.tight_layout()
 plt.show()
 
-#Print out a list of the avalible data for both liday systems and their corresponding timestamps
-#as a .csv file for further analysis
-timestamps_wls71 = [os.path.basename(path).split('_', 1)[1] for path in all_sta_files_wls71]
-timestamps_wls73 = [os.path.basename(path).split('_', 1)[1] for path in all_sta_files_wls73]
-df_wls71 = pd.DataFrame({'Lidar': 'WLS71460', 'Timestamp': timestamps_wls71})
-df_wls73 = pd.DataFrame({'Lidar': 'WLS73514', 'Timestamp': timestamps_wls73})
-df_all = pd.concat([df_wls71, df_wls73], ignore_index=True)
+# Align file timestamps and indicate whether each lidar has a file at that timestamp.
+timestamps = times_wls71.union(times_wls73).unique().sort_values()
+df_all = pd.DataFrame({
+    'Timestamp': timestamps,
+    'WLS71460': timestamps.isin(times_wls71),
+    'WLS73514': timestamps.isin(times_wls73),
+})
 df_all.to_csv('lidar_data_availability.csv', index=False)
 print("Lidar data availability saved to 'lidar_data_availability.csv'")
