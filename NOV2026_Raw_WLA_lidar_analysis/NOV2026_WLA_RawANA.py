@@ -11,6 +11,7 @@ import glob
 import os
 import re
 import scipy.stats as stats
+from scipy import stats
 ####################################
 # Pulling the data from the WLS71460 lidar
 dp_wls71 = "C:/Users/kwilde/OneDrive - NLR/Documents/GitHub/KW_Codebook/Raw_Lidar_NOV2026/WLS71460"
@@ -134,10 +135,10 @@ for lidar in ['WLS71460', 'WLS73514']:
     counts.columns = [f'{lidar}_available', f'{lidar}_recorded']
     summary = summary.merge(counts, on='Height_m', how='left')
 
-output_dir = os.path.dirname(os.path.abspath(__file__))
-measurement_availability.to_csv(os.path.join(output_dir, 'lidar_measurement_availability.csv'), index=False)
-summary.to_csv(os.path.join(output_dir, 'lidar_availability_by_height.csv'), index=False)
-print("Saved measurement availability and counts by height to", output_dir)
+# output_dir = os.path.dirname(os.path.abspath(__file__))
+# measurement_availability.to_csv(os.path.join(output_dir, 'lidar_measurement_availability.csv'), index=False)
+# summary.to_csv(os.path.join(output_dir, 'lidar_availability_by_height.csv'), index=False)
+# print("Saved measurement availability and counts by height to", output_dir)
 
 fig, ax = plt.subplots(figsize=(10, 6))
 ax.plot(times_wls71, [1]*len(times_wls71), 'bo', label='WLS71460')
@@ -214,3 +215,105 @@ fig.suptitle('Available Wind-Speed Measurements by Height')
 fig.autofmt_xdate()
 plt.tight_layout()
 plt.show()
+################################################################
+# Find timestamps where both lidars have wind-speed data at all three heights.
+required_heights = [40, 60, 80]
+matching_measurements = measurement_availability.loc[
+    measurement_availability['Height_m'].isin(required_heights)
+    & measurement_availability['WLS71460'].eq(True)
+    & measurement_availability['WLS73514'].eq(True)
+]
+matching_heights = matching_measurements.groupby('Timestamp')['Height_m'].nunique()
+common_timestamps = matching_heights[matching_heights == len(required_heights)].index.sort_values()
+
+# Print results in a readable format with both date and time
+print("\n" + "="*70)
+print("Timestamps with wind-speed data for both lidars at 40, 60, and 80 m:")
+print("="*70)
+for timestamp in common_timestamps:
+    print(f"  {timestamp.strftime('%Y-%m-%d %H:%M')}")
+print("="*70)
+print(f"Total common timestamps: {len(common_timestamps)}\n")
+print("First common timestamp:")
+if not common_timestamps.empty:
+    print(f"  {common_timestamps[0].strftime('%Y-%m-%d %H:%M')}")
+else:
+    print("  None")
+
+print("Last common timestamp:")
+if not common_timestamps.empty:
+    print(f"  {common_timestamps[-1].strftime('%Y-%m-%d %H:%M')}")
+else:
+    print("  None")
+######################################################################
+# now with our common time range between both lidars at the required heights,
+#we can make a linear regression plot for the measured wind speeds for the total common timestamps
+# at the heights of 50 m (linearlly interpolated between the 40 and 60 m measurements) and 80 m
+# plot the linear regression results for wind speeds at 50 m and 80 m for both lidars
+# Extract wind-speed measurements for the common timestamps and required heights
+# for the time range of Febuary 16 to May 24
+start_date = pd.Timestamp('2026-02-16')
+end_date = pd.Timestamp('2026-05-24')
+
+
+wls71_common = availability_wls71.loc[
+    availability_wls71['Timestamp'].isin(common_timestamps)
+    & availability_wls71['Height_m'].isin(required_heights)
+]
+wls73_common = availability_wls73.loc[
+    availability_wls73['Timestamp'].isin(common_timestamps)
+    & availability_wls73['Height_m'].isin(required_heights)
+]
+
+wls71_common = wls71_common.loc[
+    (wls71_common['Timestamp'] >= start_date)
+    & (wls71_common['Timestamp'] <= end_date)
+]
+wls73_common = wls73_common.loc[
+    (wls73_common['Timestamp'] >= start_date)
+    & (wls73_common['Timestamp'] <= end_date)
+]
+
+#linearly interpolate wind speeds at 50 m between 40 and 60 m measurements
+wls71_40 = wls71_common[wls71_common['Height_m'] == 40]
+wls71_60 = wls71_common[wls71_common['Height_m'] == 60]
+wls73_40 = wls73_common[wls73_common['Height_m'] == 40]
+wls73_60 = wls73_common[wls73_common['Height_m'] == 60]
+
+wls71_50 = (wls71_40.set_index('Timestamp')['WindSpeed'] + wls71_60.set_index('Timestamp')['WindSpeed']) / 2
+wls73_50 = (wls73_40.set_index('Timestamp')['WindSpeed'] + wls73_60.set_index('Timestamp')['WindSpeed']) / 2
+wls71_50 = wls71_50.reset_index()
+wls73_50 = wls73_50.reset_index()
+
+# Extract wind-speed measurements at 50 m (interpolated) and 80 m
+wls71_80 = wls71_common[wls71_common['Height_m'] == 80]
+wls73_80 = wls73_common[wls73_common['Height_m'] == 80]
+
+fig, ax = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True, constrained_layout=True)
+# Plot linear regression for wind speeds at 50 m and 80 m for both lidars
+axes = ax.ravel()
+heights = [50, 80]
+for i, height in enumerate(heights):
+    if height == 50:
+        x = wls71_50['WindSpeed']
+        y = wls73_50['WindSpeed']
+    elif height == 80:
+        x = wls71_80['WindSpeed']
+        y = wls73_80['WindSpeed']
+    slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+    ax = axes[i]
+    ax.scatter(x, y, label=f'Height {height} m')
+    ax.plot(x, intercept + slope * x, 'r', label=f'Fit: y={slope:.2f}x+{intercept:.2f}')
+    ax.set_title(f'Height {height} m')
+    ax.set_xlabel('WLS71 Wind Speed [m/s]')
+    ax.set_ylabel('WLS73 Wind Speed [m/s]')
+    ax.legend()
+    ax.text(0.05, 0.95, f'R² = {r_value**2:.2f}', transform=ax.transAxes, verticalalignment='top')
+    ax.text(0.05, 0.90, f'Slope = {slope:.2f}', transform=ax.transAxes, verticalalignment='top')
+    ax.text(0.05, 0.85, f'Intercept = {intercept:.2f}', transform=ax.transAxes, verticalalignment='top')
+    ax.text(0.05, 0.80, f'P-value = {p_value:.2e}', transform=ax.transAxes, verticalalignment='top')
+    ax.text(0.05, 0.75, f'Std Err = {std_err:.2e}', transform=ax.transAxes, verticalalignment='top')
+    ax.text(0.05, 0.70, f'N = {len(x)}', transform=ax.transAxes, verticalalignment='top')
+plt.show()
+
+### Go back to and fix later 
