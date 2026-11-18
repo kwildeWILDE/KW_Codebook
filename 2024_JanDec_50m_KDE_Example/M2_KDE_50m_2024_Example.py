@@ -171,8 +171,13 @@ kde_values = kde(positions).reshape(W.shape)
 
 # Plot the KDE as a contour plot
 plt.figure(figsize=(8, 6))
-plt.contourf(W, T, kde_values, levels=20, cmap='viridis')
-plt.scatter(wind_speed, temperature, c='blue', label='Raw Data', alpha=0.5)
+plt.scatter(wind_speed, temperature, c='blue', label='Raw Data', alpha=0.3, s=3)
+filled_contours = plt.contourf(W, T, kde_values, levels=20, cmap='viridis', alpha=0.7)
+contour_lines = plt.contour(W, T, kde_values, levels=filled_contours.levels, colors='white', linewidths=0.5)
+colorbar = plt.colorbar(filled_contours)
+colorbar.add_lines(contour_lines)
+colorbar.set_label('Probability density [1 / ((m/s) * °C)]')
+
 plt.xlabel('Wind Speed at 50m (m/s)')
 plt.ylabel('Temperature at 50m (°C)')
 plt.title('2D KDE of Wind Speed and Temperature at 50m Height')
@@ -185,13 +190,12 @@ wind_speed = N_matrix[:, 0]
 temperature = N_matrix[:, 1]
 
 # Create a scatter plot of the raw data points
-plt.figure(figsize=(8, 6))
-plt.scatter(wind_speed, temperature, c='blue', label='Raw Data', alpha=0.5)
-plt.xlabel('Wind Speed at 50m (m/s)')
-plt.ylabel('Temperature at 50m (°C)')
-plt.title('Wind Speed and Temperature at 50m Height')
-plt.legend()
-plt.show()
+# plt.figure(figsize=(8, 6))
+# plt.scatter(wind_speed, temperature, c='blue', label='Raw Data', alpha=0.5)
+# plt.xlabel('Wind Speed at 50m (m/s)')
+# plt.ylabel('Temperature at 50m (°C)')
+# plt.title('Wind Speed and Temperature at 50m Height')
+# plt.legend()
+# plt.show()
 
 
-# RUN AND GO BACK TO WORKING ON AFTER FINISHING ANOTHER TASK
