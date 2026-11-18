@@ -476,4 +476,32 @@ fig.suptitle('Time Series of Wind Speeds at 50 m and 80 m for Both Lidars and M2
 plt.show()
 
 ##############################################################################################
-
+# Now make linear regression plots for M2 vs lidar wind speeds at 50 m and 80 m
+# Make sure that the points for the linear regression are aligned pairs and data available for both M2 and lidar measurements
+fig, axes = plt.subplots(2, 2, figsize=(12, 9), sharex=True, sharey=True, constrained_layout=True)
+for row, height in enumerate([50, 80]):
+    m2_column = f'Avg Wind Speed @ {height}m [m/s]'
+    for column, (lidar, label) in enumerate([('wls71', 'WLS71'), ('wls73', 'WLS73')]):
+        lidar_column = f'{height}_{lidar}'
+        merged = ds_m2_filtered[[m2_column]].join(
+            paired_speeds[[lidar_column]], how='inner', validate='one_to_one',
+        )
+        merged = merged.loc[np.isfinite(merged[m2_column]) & np.isfinite(merged[lidar_column])]
+        x, y = merged[m2_column], merged[lidar_column]
+        if len(x) < 2 or x.nunique() < 2:
+            raise ValueError(f"Regression at {height} m for {label} needs at least two distinct M2 wind speeds")
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+        ax = axes[row, column]
+        ax.scatter(x, y, label='Measurements', alpha=0.5, s=8)
+        fit_x = np.array([x.min(), x.max()])
+        ax.plot(
+            fit_x, intercept + slope * fit_x, 'r',
+            label=f'Fit: y={slope:.2f}x{intercept:+.2f}\nR² = {r_value**2:.2f}\nn = {len(x)}',
+        )
+        ax.set_xlabel('M2 Wind Speed [m/s]')
+        ax.set_ylabel(f'{label} Wind Speed [m/s]')
+        ax.set_title(f'M2 vs {label} at {height} m')
+        ax.legend()
+        ax.grid(True, linestyle='--', alpha=0.7)
+fig.suptitle('M2 and Lidar Wind Speed Regression (Feb 16 to May 24, 2026 UTC)')
+plt.show()
