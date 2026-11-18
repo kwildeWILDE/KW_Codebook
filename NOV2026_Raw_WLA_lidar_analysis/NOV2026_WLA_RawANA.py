@@ -384,4 +384,96 @@ fig.suptitle('Linear Regression of Wind Speeds at 50 m and 80 m for Both Lidars 
 plt.show()
 
 ##################################################################################
+# Pull the M2 data from Feb to May 2026
+dp_m2 ="C:/Users/kwilde/OneDrive - NLR/Documents"
+file_path_m2 = f"{dp_m2}/M2_1min_FEB_MAY_2026_DataPull.xlsx"
+
+
+#read the file 
+#read_excel is slow, so cache it as a pickle and reuse it until the Excel file changes
+cache_m2 = file_path_m2.replace('.xlsx', '_cache.pkl')
+if os.path.exists(cache_m2) and os.path.getmtime(cache_m2) > os.path.getmtime(file_path_m2):
+    ds_m2 = pd.read_pickle(cache_m2)
+else:
+    ds_m2 = pd.read_excel(file_path_m2)
+    ds_m2.to_pickle(cache_m2)
+
+print("Number of raw data points:", len(ds_m2))
+
+# Convert fixed MST (UTC-7) to timezone-aware UTC.
+mst_time = pd.to_datetime(ds_m2['DATE (MM/DD/YYYY)']).astype(str) + ' ' + ds_m2['MST'].astype(str)
+ds_m2['UTC'] = (
+    pd.to_datetime(mst_time, errors='raise')
+    .dt.tz_localize(timezone(timedelta(hours=-7)))
+    .dt.tz_convert('UTC')
+)
+if ds_m2['UTC'].isna().any():
+    raise ValueError("Missing M2 measurement timestamp")
+# Set the UTC column as the index for easier time-based operations
+ds_m2.set_index('UTC', inplace=True)
+ds_m2.sort_index(inplace=True)
+
+# Include the filter to remove "flat values"
+MIN_FLAT_RUN = 3 # consecutive identical samples treated as flat; adjust to the M2 sampling interval
+
+def mask_flat_runs(series, min_run=MIN_FLAT_RUN):
+    run_id = (
+        (series != series.shift())
+        | (series.index.to_series().diff() != pd.Timedelta(minutes=1))
+    ).cumsum()
+    run_len = series.groupby(run_id).transform('size')
+    return series.mask((run_len >= min_run) & series.notna())
+
+wind_columns = ["Avg Wind Speed @ 50m [m/s]", "Avg Wind Speed @ 80m [m/s]"]
+missing_columns = [col for col in wind_columns if col not in ds_m2.columns]
+if missing_columns:
+    raise ValueError(f"Missing M2 wind speed columns: {missing_columns}")
+ds_m2_filtered = ds_m2[wind_columns].copy()
+for col in wind_columns:
+    ds_m2_filtered[col] = pd.to_numeric(ds_m2_filtered[col], errors='raise')
+    ds_m2_filtered[col] = ds_m2_filtered[col].where(ds_m2_filtered[col].between(0, 50))
+
+if ds_m2_filtered.index.has_duplicates:
+    grouped = ds_m2_filtered.groupby(level=0)
+    conflicts = grouped.nunique().gt(1).any(axis=1)
+    if conflicts.any():
+        raise ValueError(f"Conflicting M2 measurements at {conflicts[conflicts].index[0]}")
+    duplicate_count = ds_m2_filtered.index.duplicated().sum()
+    warnings.warn(f"Combining {duplicate_count} duplicate M2 timestamps", stacklevel=1)
+    ds_m2_filtered = grouped.first()
+
+for col in wind_columns:
+    ds_m2_filtered[col] = mask_flat_runs(ds_m2_filtered[col])
+
+# Label each [start, end) interval with its end time in UTC.
+ds_m2_filtered = (
+    ds_m2_filtered.resample('10min', label='right', closed='left')
+    .mean()
+    .reset_index()
+)
+
+print("M2 dataset successfully flat-run filtered and resampled to 10-minute intervals.")
+print("First few rows of the processed M2 dataset:")
+print(ds_m2_filtered.head())
+
+#############################################################################
+#Create a time series plot for the M2 wind speed along the lidar wind speed time series perviously made
+#make sure the M2 and lidar datasets have the same time index for plotting
+ds_m2_filtered.set_index('UTC', inplace=True)
+ds_m2_filtered.sort_index(inplace=True)
+
+fig, ax = plt.subplots(2, 1, figsize=(12, 8), sharex=True, constrained_layout=True)
+for i, height in enumerate([50, 80]):
+    ax[i].plot(ds_m2_filtered.index, ds_m2_filtered[f'Avg Wind Speed @ {height}m [m/s]'], label='M2', alpha=0.3, linestyle='--', linewidth=0.7, color='purple')
+    ax[i].plot(plot_speeds.index, plot_speeds[f'{height}_wls71'], label='WLS71', alpha=0.7)
+    ax[i].plot(plot_speeds.index, plot_speeds[f'{height}_wls73'], label='WLS73', alpha=0.7)
+    ax[i].set_title(f'Wind Speeds at {height} m')
+    ax[i].set_ylabel('Wind Speed [m/s]')
+    ax[i].legend()
+    ax[i].grid(True, linestyle='--', alpha=0.7)
+ax[-1].set_xlabel('Timestamp (UTC)')
+fig.suptitle('Time Series of Wind Speeds at 50 m and 80 m for Both Lidars and M2(10min resampled) (Feb 16 to May 24, 2026 UTC)')
+plt.show()
+
+##############################################################################################
 
