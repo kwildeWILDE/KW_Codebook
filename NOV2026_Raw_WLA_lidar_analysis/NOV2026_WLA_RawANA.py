@@ -54,6 +54,32 @@ all_sta_files_wls73 = sta_files_wls73_921 + sta_files_wls73_507
 print("Total number of .sta files for WLS73514 lidar:", len(all_sta_files_wls73))
 print(all_sta_files_wls73[:20])
 
+#Print the heads of the first few .sta files for both lidars to inspect the data
+print("WLS71460 first .sta file head:")
+with open(all_sta_files_wls71[0], 'r', encoding='utf-8-sig') as f:
+    for _ in range(10):
+        print(f.readline().rstrip('\r\n'))
+
+print("\nWLS73514 first .sta file head:")
+with open(all_sta_files_wls73[0], 'r', encoding='utf-8-sig') as f:
+    for _ in range(10):
+        print(f.readline().rstrip('\r\n'))
+
+#Print the coloumn names of the first .sta file for both lidars
+print("WLS71460 first .sta file columns:")
+with open(all_sta_files_wls71[0], 'r', encoding='utf-8-sig') as f:
+    for line in f:
+        if line.startswith('Timestamp (end of interval)'):
+            print(line.rstrip('\r\n').split('\t'))
+            break
+
+print("\nWLS73514 first .sta file columns:")
+with open(all_sta_files_wls73[0], 'r', encoding='utf-8-sig') as f:
+    for line in f:
+        if line.startswith('Timestamp (end of interval)'):
+            print(line.rstrip('\r\n').split('\t'))
+            break
+
 ##################################################################
 #Now that we have pulled the data from both WLS71460 and WLS73514 lidars, we can proceed comparing the data quality from both lidar systems 
 
@@ -113,9 +139,11 @@ def get_measurement_availability(sta_files, lidar):
         speeds = data[speed_indices].apply(pd.to_numeric, errors='raise').to_numpy()
         availability = data[availability_columns].apply(pd.to_numeric, errors='raise').to_numpy()
         available = np.isfinite(speeds) & np.isfinite(availability) & (availability > 0)
-        frame = pd.DataFrame(available, columns=heights)
+        frame = pd.DataFrame(speeds, columns=heights)
         frame.insert(0, 'Timestamp', measurement_times)
-        frames.append(frame.melt(id_vars='Timestamp', var_name='Height_m', value_name=lidar))
+        frame = frame.melt(id_vars='Timestamp', var_name='Height_m', value_name='WindSpeed')
+        frame[lidar] = pd.DataFrame(available, columns=heights).melt(value_name=lidar)[lidar]
+        frames.append(frame)
 
     result = pd.concat(frames, ignore_index=True)
     if result.duplicated(['Timestamp', 'Height_m']).any():
@@ -125,8 +153,8 @@ def get_measurement_availability(sta_files, lidar):
 
 availability_wls71 = get_measurement_availability(all_sta_files_wls71, 'WLS71460')
 availability_wls73 = get_measurement_availability(all_sta_files_wls73, 'WLS73514')
-measurement_availability = availability_wls71.merge(
-    availability_wls73, on=['Timestamp', 'Height_m'], how='outer',
+measurement_availability = availability_wls71.drop(columns='WindSpeed').merge(
+    availability_wls73.drop(columns='WindSpeed'), on=['Timestamp', 'Height_m'], how='outer',
 ).sort_values(['Timestamp', 'Height_m'])
 
 summary = pd.DataFrame({'Height_m': sorted(measurement_availability['Height_m'].unique())})
@@ -163,6 +191,7 @@ timestamps = times_wls71.union(times_wls73).unique().sort_values()
 # })
 # df_all.to_csv('lidar_data_availability.csv', index=False)
 # print("Lidar data availability saved to 'lidar_data_availability.csv'")
+
 
 ##########################################################################################
 # see if we can make another plot that shows the overall time availability for the data and the different heights of the lidar measurements
@@ -227,12 +256,12 @@ matching_heights = matching_measurements.groupby('Timestamp')['Height_m'].nuniqu
 common_timestamps = matching_heights[matching_heights == len(required_heights)].index.sort_values()
 
 # Print results in a readable format with both date and time
-print("\n" + "="*70)
-print("Timestamps with wind-speed data for both lidars at 40, 60, and 80 m:")
-print("="*70)
-for timestamp in common_timestamps:
-    print(f"  {timestamp.strftime('%Y-%m-%d %H:%M')}")
-print("="*70)
+# print("\n" + "="*70)
+# print("Timestamps with wind-speed data for both lidars at 40, 60, and 80 m:")
+# print("="*70)
+# for timestamp in common_timestamps:
+#     print(f"  {timestamp.strftime('%Y-%m-%d %H:%M')}")
+# print("="*70)
 print(f"Total common timestamps: {len(common_timestamps)}\n")
 print("First common timestamp:")
 if not common_timestamps.empty:
@@ -245,6 +274,9 @@ if not common_timestamps.empty:
     print(f"  {common_timestamps[-1].strftime('%Y-%m-%d %H:%M')}")
 else:
     print("  None")
+
+##
+
 ######################################################################
 # now with our common time range between both lidars at the required heights,
 #we can make a linear regression plot for the measured wind speeds for the total common timestamps
@@ -254,66 +286,54 @@ else:
 # for the time range of Febuary 16 to May 24
 start_date = pd.Timestamp('2026-02-16')
 end_date = pd.Timestamp('2026-05-24')
-
-
-wls71_common = availability_wls71.loc[
-    availability_wls71['Timestamp'].isin(common_timestamps)
-    & availability_wls71['Height_m'].isin(required_heights)
-]
-wls73_common = availability_wls73.loc[
-    availability_wls73['Timestamp'].isin(common_timestamps)
-    & availability_wls73['Height_m'].isin(required_heights)
+end_exclusive = end_date + pd.Timedelta(days=1)
+regression_timestamps = common_timestamps[
+    (common_timestamps >= start_date) & (common_timestamps < end_exclusive)
 ]
 
-wls71_common = wls71_common.loc[
-    (wls71_common['Timestamp'] >= start_date)
-    & (wls71_common['Timestamp'] <= end_date)
-]
-wls73_common = wls73_common.loc[
-    (wls73_common['Timestamp'] >= start_date)
-    & (wls73_common['Timestamp'] <= end_date)
-]
+def speeds_by_timestamp(availability):
+    measurements = availability.loc[
+        availability['Timestamp'].isin(regression_timestamps)
+        & availability['Height_m'].isin(required_heights)
+    ]
+    return measurements.pivot(index='Timestamp', columns='Height_m', values='WindSpeed')
 
-#linearly interpolate wind speeds at 50 m between 40 and 60 m measurements
-wls71_40 = wls71_common[wls71_common['Height_m'] == 40]
-wls71_60 = wls71_common[wls71_common['Height_m'] == 60]
-wls73_40 = wls73_common[wls73_common['Height_m'] == 40]
-wls73_60 = wls73_common[wls73_common['Height_m'] == 60]
+wls71_speeds = speeds_by_timestamp(availability_wls71)
+wls73_speeds = speeds_by_timestamp(availability_wls73)
+if regression_timestamps.empty:
+    raise ValueError("No common measurements at 40, 60 and 80 m in the requested date range")
 
-wls71_50 = (wls71_40.set_index('Timestamp')['WindSpeed'] + wls71_60.set_index('Timestamp')['WindSpeed']) / 2
-wls73_50 = (wls73_40.set_index('Timestamp')['WindSpeed'] + wls73_60.set_index('Timestamp')['WindSpeed']) / 2
-wls71_50 = wls71_50.reset_index()
-wls73_50 = wls73_50.reset_index()
+# Linearly interpolate 50 m, then pair both lidars on the measurement timestamp.
+wls71_speeds[50] = (wls71_speeds[40] + wls71_speeds[60]) / 2
+wls73_speeds[50] = (wls73_speeds[40] + wls73_speeds[60]) / 2
+paired_speeds = wls71_speeds[[50, 80]].join(
+    wls73_speeds[[50, 80]], how='inner', lsuffix='_wls71', rsuffix='_wls73',
+)
 
-# Extract wind-speed measurements at 50 m (interpolated) and 80 m
-wls71_80 = wls71_common[wls71_common['Height_m'] == 80]
-wls73_80 = wls73_common[wls73_common['Height_m'] == 80]
-
-fig, ax = plt.subplots(1, 2, figsize=(12, 5), sharex=True, sharey=True, constrained_layout=True)
+fig, ax = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True, constrained_layout=True)
 # Plot linear regression for wind speeds at 50 m and 80 m for both lidars
 axes = ax.ravel()
 heights = [50, 80]
 for i, height in enumerate(heights):
-    if height == 50:
-        x = wls71_50['WindSpeed']
-        y = wls73_50['WindSpeed']
-    elif height == 80:
-        x = wls71_80['WindSpeed']
-        y = wls73_80['WindSpeed']
+    x = paired_speeds[f'{height}_wls71']
+    y = paired_speeds[f'{height}_wls73']
+    if len(x) < 2 or x.nunique() < 2:
+        raise ValueError(f"Regression at {height} m needs at least two distinct WLS71460 wind speeds")
     slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
     ax = axes[i]
-    ax.scatter(x, y, label=f'Height {height} m')
-    ax.plot(x, intercept + slope * x, 'r', label=f'Fit: y={slope:.2f}x+{intercept:.2f}')
+    ax.scatter(x, y, alpha=0.7, label=f'Height {height} m')
+    fit_x = np.array([x.min(), x.max()])
+    ax.plot(
+        fit_x, intercept + slope * fit_x, 'r',
+        label=f'Fit: y={slope:.2f}x+{intercept:.2f}\nR² = {r_value**2:.2f}\nN = {len(x)}',
+    )
     ax.set_title(f'Height {height} m')
     ax.set_xlabel('WLS71 Wind Speed [m/s]')
     ax.set_ylabel('WLS73 Wind Speed [m/s]')
     ax.legend()
-    ax.text(0.05, 0.95, f'R² = {r_value**2:.2f}', transform=ax.transAxes, verticalalignment='top')
-    ax.text(0.05, 0.90, f'Slope = {slope:.2f}', transform=ax.transAxes, verticalalignment='top')
-    ax.text(0.05, 0.85, f'Intercept = {intercept:.2f}', transform=ax.transAxes, verticalalignment='top')
-    ax.text(0.05, 0.80, f'P-value = {p_value:.2e}', transform=ax.transAxes, verticalalignment='top')
-    ax.text(0.05, 0.75, f'Std Err = {std_err:.2e}', transform=ax.transAxes, verticalalignment='top')
-    ax.text(0.05, 0.70, f'N = {len(x)}', transform=ax.transAxes, verticalalignment='top')
+    ax.grid(True, linestyle='--', alpha=0.7)
+fig.suptitle('Linear Regression of Wind Speeds at 50 m and 80 m for Both Lidars (From Feb 16 to May 24, 2026)')
 plt.show()
 
-### Go back to and fix later 
+##################################################################################
+
