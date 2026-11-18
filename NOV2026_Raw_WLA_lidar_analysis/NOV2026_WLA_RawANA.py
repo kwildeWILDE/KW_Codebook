@@ -1,5 +1,6 @@
 #import necessary libraries
 from webbrowser import get
+from datetime import timedelta, timezone
 
 import numpy as np
 import pandas as pd
@@ -10,6 +11,7 @@ import xarray as xr
 import glob
 import os
 import re
+import warnings
 import scipy.stats as stats
 from scipy import stats
 ####################################
@@ -106,12 +108,28 @@ def get_measurement_availability(sta_files, lidar):
     frames = []
     for file_path in sta_files:
         with open(file_path, 'r', encoding='utf-8-sig') as f:
+            file_timezone = None
             for line in f:
+                if line.lower().startswith('timezone='):
+                    if file_timezone is not None:
+                        raise ValueError(f"Multiple timezones found in {file_path}")
+                    value = line.split('=', 1)[1].strip()
+                    match = re.fullmatch(r'UTC(?:([+-])(\d{1,2})(?::(\d{2}))?)?', value, re.IGNORECASE)
+                    if not match:
+                        raise ValueError(f"Invalid timezone {value!r} in {file_path}")
+                    hours = int(match.group(2) or 0)
+                    minutes = int(match.group(3) or 0)
+                    if hours > 23 or minutes > 59:
+                        raise ValueError(f"Invalid timezone {value!r} in {file_path}")
+                    offset = timedelta(hours=hours, minutes=minutes)
+                    file_timezone = timezone(-offset if match.group(1) == '-' else offset)
                 if line.startswith('Timestamp (end of interval)'):
                     header = line.rstrip('\r\n').split('\t')
                     break
             else:
                 raise ValueError(f"Measurement header not found in {file_path}")
+            if file_timezone is None:
+                raise ValueError(f"Timezone not found in {file_path}")
 
             speed_columns = {}
             for i, column in enumerate(header):
@@ -136,6 +154,7 @@ def get_measurement_availability(sta_files, lidar):
         measurement_times = pd.to_datetime(data[0], format='%Y/%m/%d %H:%M', errors='raise')
         if measurement_times.isna().any():
             raise ValueError(f"Missing measurement timestamp in {file_path}")
+        measurement_times = measurement_times.dt.tz_localize(file_timezone).dt.tz_convert('UTC')
         speeds = data[speed_indices].apply(pd.to_numeric, errors='raise').to_numpy()
         availability = data[availability_columns].apply(pd.to_numeric, errors='raise').to_numpy()
         available = np.isfinite(speeds) & np.isfinite(availability) & (availability > 0)
@@ -146,8 +165,15 @@ def get_measurement_availability(sta_files, lidar):
         frames.append(frame)
 
     result = pd.concat(frames, ignore_index=True)
-    if result.duplicated(['Timestamp', 'Height_m']).any():
-        raise ValueError(f"Duplicate measurement timestamp and height for {lidar}")
+    duplicates = result.duplicated(['Timestamp', 'Height_m'], keep=False)
+    if duplicates.any():
+        ambiguous_times = result.loc[duplicates, 'Timestamp'].unique()
+        warnings.warn(
+            f"Excluding {len(ambiguous_times)} ambiguous UTC timestamps for {lidar} "
+            "with multiple measurements at the same height",
+            stacklevel=2,
+        )
+        result = result.loc[~result['Timestamp'].isin(ambiguous_times)]
     return result
 
 
@@ -238,8 +264,8 @@ for ax, data, lidar, color in [
     ax.set_ylim(30, 410)
     ax.grid(True, linestyle='--', linewidth=0.5, alpha=0.4)
 axes[-1].xaxis.set_major_locator(mdates.AutoDateLocator())
-axes[-1].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d'))
-axes[-1].set_xlabel('Measurement date')
+axes[-1].xaxis.set_major_formatter(mdates.DateFormatter('%Y-%m-%d', tz='UTC'))
+axes[-1].set_xlabel('Measurement date (UTC)')
 fig.suptitle('Available Wind-Speed Measurements by Height')
 fig.autofmt_xdate()
 plt.tight_layout()
@@ -265,13 +291,13 @@ common_timestamps = matching_heights[matching_heights == len(required_heights)].
 print(f"Total common timestamps: {len(common_timestamps)}\n")
 print("First common timestamp:")
 if not common_timestamps.empty:
-    print(f"  {common_timestamps[0].strftime('%Y-%m-%d %H:%M')}")
+    print(f"  {common_timestamps[0].strftime('%Y-%m-%d %H:%M %Z')}")
 else:
     print("  None")
 
 print("Last common timestamp:")
 if not common_timestamps.empty:
-    print(f"  {common_timestamps[-1].strftime('%Y-%m-%d %H:%M')}")
+    print(f"  {common_timestamps[-1].strftime('%Y-%m-%d %H:%M %Z')}")
 else:
     print("  None")
 
@@ -284,8 +310,8 @@ else:
 # plot the linear regression results for wind speeds at 50 m and 80 m for both lidars
 # Extract wind-speed measurements for the common timestamps and required heights
 # for the time range of Febuary 16 to May 24
-start_date = pd.Timestamp('2026-02-16')
-end_date = pd.Timestamp('2026-05-24')
+start_date = pd.Timestamp('2026-02-16', tz='UTC')
+end_date = pd.Timestamp('2026-05-24', tz='UTC')
 end_exclusive = end_date + pd.Timedelta(days=1)
 regression_timestamps = common_timestamps[
     (common_timestamps >= start_date) & (common_timestamps < end_exclusive)
@@ -310,6 +336,28 @@ paired_speeds = wls71_speeds[[50, 80]].join(
     wls73_speeds[[50, 80]], how='inner', lsuffix='_wls71', rsuffix='_wls73',
 )
 
+################################################################################
+# Create a time series plot for the wind speeds at 50 m and 80 m for both lidars 
+# Insert missing values where successive paired measurements are more than 10 minutes apart.
+gaps = paired_speeds.index.to_series().diff() > pd.Timedelta(minutes=10)
+gap_times = paired_speeds.index[gaps] - pd.Timedelta(minutes=10)
+plot_speeds = paired_speeds.reindex(paired_speeds.index.union(gap_times))
+
+fig, ax = plt.subplots(2, 1, figsize=(12, 8), sharex=True, constrained_layout=True)
+for i, height in enumerate([50, 80]):
+    ax[i].plot(plot_speeds.index, plot_speeds[f'{height}_wls71'], label='WLS71', alpha=0.7)
+    ax[i].plot(plot_speeds.index, plot_speeds[f'{height}_wls73'], label='WLS73', alpha=0.7)
+    ax[i].set_title(f'Wind Speeds at {height} m')
+    ax[i].set_ylabel('Wind Speed [m/s]')
+    ax[i].legend()
+    ax[i].grid(True, linestyle='--', alpha=0.7)
+ax[-1].set_xlabel('Timestamp (UTC)')
+fig.suptitle('Time Series of Wind Speeds at 50 m and 80 m for Both Lidars (Feb 16 to May 24, 2026 UTC)')
+plt.show()
+
+
+###################################################################################
+# The linear regression between the wind speeds measured by WLS71 and WLS73 at 50 m and 80 m for the common timestamps
 fig, ax = plt.subplots(1, 2, figsize=(12, 6), sharex=True, sharey=True, constrained_layout=True)
 # Plot linear regression for wind speeds at 50 m and 80 m for both lidars
 axes = ax.ravel()
@@ -332,7 +380,7 @@ for i, height in enumerate(heights):
     ax.set_ylabel('WLS73 Wind Speed [m/s]')
     ax.legend()
     ax.grid(True, linestyle='--', alpha=0.7)
-fig.suptitle('Linear Regression of Wind Speeds at 50 m and 80 m for Both Lidars (From Feb 16 to May 24, 2026)')
+fig.suptitle('Linear Regression of Wind Speeds at 50 m and 80 m for Both Lidars (Feb 16 to May 24, 2026 UTC)')
 plt.show()
 
 ##################################################################################
