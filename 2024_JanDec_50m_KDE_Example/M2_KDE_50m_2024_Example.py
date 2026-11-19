@@ -196,7 +196,7 @@ temperature = N_matrix[:, 1]
 # create a .csv file of the date, time (UTC), Temperature, and Wind Speed at 50m, and KDE values for each data point
 import pandas as pd
 
-date_time = ds_m2_filtered['Date Time (UTC)']
+date_time = ds_m2_filtered['datetime_utc']
 csv_data = pd.DataFrame({
     'Date Time (UTC)': date_time,
     'Temperature at 50m (°C)': temperature,
