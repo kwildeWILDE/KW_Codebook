@@ -144,9 +144,13 @@ for n_idx in range(n):
     bi_kde_values.append(bi_kde)
 
 # Test the bi-variable KDE calculation for the first few data points
-print("Bi-variable KDE results (first 5 data points):")
-for idx in range(min(5, len(bi_kde_values))):
-    print(f"  Point {idx}: {bi_kde_values[idx]:.6e}")
+print("Bi-variable KDE results (first 5 data points of wind speed and temperature at 50m):")
+for idx in range(min(5, len(bi_kde_values), len(N_matrix))):
+    wind_speed_value, temperature_value = N_matrix[idx]
+    print(
+        f"  Point {idx}: Wind speed = {wind_speed_value:.6f} m/s, "
+        f"Temperature = {temperature_value:.6f} °C, KDE = {bi_kde_values[idx]:.6e}"
+    )
 
 # With this function we can now try to create a 2D KDE plot for wind speed and temperature at 50m height
 #for a better understanding we can also plot the raw data points of wind speed and temperature at 50m height 
@@ -188,14 +192,17 @@ import matplotlib.pyplot as plt
 # Extract wind speed and temperature for plotting
 wind_speed = N_matrix[:, 0]
 temperature = N_matrix[:, 1]
+###########################################################
+# create a .csv file of the date, time (UTC), Temperature, and Wind Speed at 50m, and KDE values for each data point
+import pandas as pd
 
-# Create a scatter plot of the raw data points
-# plt.figure(figsize=(8, 6))
-# plt.scatter(wind_speed, temperature, c='blue', label='Raw Data', alpha=0.5)
-# plt.xlabel('Wind Speed at 50m (m/s)')
-# plt.ylabel('Temperature at 50m (°C)')
-# plt.title('Wind Speed and Temperature at 50m Height')
-# plt.legend()
-# plt.show()
+date_time = ds_m2_filtered['Date Time (UTC)']
+csv_data = pd.DataFrame({
+    'Date Time (UTC)': date_time,
+    'Temperature at 50m (°C)': temperature,
+    'Wind Speed at 50m (m/s)': wind_speed,
+    'KDE': bi_kde_values
+})
 
+csv_data.to_csv('2024_wind_temp_kde_50m.csv', index=False)
 
