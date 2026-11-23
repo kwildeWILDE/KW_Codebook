@@ -4,6 +4,7 @@ from webbrowser import get
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 import pandas as pd 
 import matplotlib.dates as mdates
 import matplotlib.colors as mcolors
@@ -93,12 +94,20 @@ print("Number of data points in filtered dataset:", len(ds_m2_filtered))
 ################################################################
 ## Now that we have the data pulled and filtered, let's try to apply a KDE equation to wind speed and temperature at height 50m 
 
+# KDE requires a finite wind speed and temperature for each observation.
+kde_columns = ['Avg Avg Wind Speed @ 50m [m/s]', 'Avg Temperature @ 50m [deg C]']
+valid_kde_rows = np.isfinite(ds_m2_filtered[kde_columns].to_numpy()).all(axis=1)
+print("Number of rows excluded from KDE due to missing or non-finite values:", (~valid_kde_rows).sum())
+ds_m2_filtered = ds_m2_filtered.loc[valid_kde_rows].copy()
+
 # Extract wind speed and temperature for all data points (d x 2 matrix: N = [wind_speed, temperature])
 wind_speed_data = ds_m2_filtered['Avg Avg Wind Speed @ 50m [m/s]'].values
 temperature_data = ds_m2_filtered['Avg Temperature @ 50m [deg C]'].values
 N_matrix = np.column_stack((wind_speed_data, temperature_data))  # (n x 2) matrix where each row is [wind_speed_i, temperature_i]
 
 n = len(ds_m2_filtered)  # Total number of data points for KDE calculation
+if n < 3:
+    raise ValueError("At least three finite wind speed and temperature pairs are required for a 2D KDE.")
 
 # Calculate the empirical covariance matrix (2 x 2) for the bi-variate data
 # Σ = 2x2 empirical sample covariance matrix computed from sample deviations
@@ -110,38 +119,31 @@ empirical_covariance = np.cov(N_matrix.T)  # (2 x 2) matrix
 m = 2  # dimensions (wind speed and temperature)
 H = ((4 / (n * (m + 2)))**((2 / (m + 4)))) * empirical_covariance
 
-# Compute bi-variate KDE at each point: f(N) = (1/nH) * sum_i K((N - N_i) / H)
-# where K is the 2D Gaussian kernel: K(x) = (1/(2π)) * exp(-0.5 * x^T * x)
+# H is the kernel covariance, not a standard-deviation matrix. The Gaussian
+# exponent is diff.T @ H_inv @ diff, and sqrt(det(H)) normalizes the density.
+try:
+    np.linalg.cholesky(H)
+except np.linalg.LinAlgError as exc:
+    raise ValueError("The KDE bandwidth covariance must be positive definite; check the input data.") from exc
+H_inv = np.linalg.inv(H)
+normalization = 1 / (n * 2 * np.pi * np.sqrt(np.linalg.det(H)))
 bi_kde_values = []
 
 for n_idx in range(n):
-    # Current evaluation point: N = [wind_speed_n, temperature_n]
-    N = N_matrix[n_idx]  # (2,) array
-    
-    # Initialize KDE sum
-    kde_sum = 0.0
-    
-    for i in range(n):
-        # Reference point from dataset: N_i = [wind_speed_i, temperature_i]
-        N_i = N_matrix[i]  # (2,) array
-        
-        # Standardized difference: (N - N_i) / H
-        diff = N - N_i  # (2,) array
-        H_inv = np.linalg.inv(H)  # (2 x 2) matrix
-        standardized_diff = H_inv @ diff  # (2,) array
-        
-        # 2D Gaussian kernel: K(x) = (1/(2π)) * exp(-0.5 * ||x||^2)
-        kernel_value = (1 / (2 * np.pi)) * np.exp(-0.5 * (standardized_diff @ standardized_diff))
-        
-        # Add to sum
-        kde_sum += kernel_value
-    
-    # Bi-variate KDE: f(N) = (1/(nH)) * sum of kernels
-    # where 1/(nH) accounts for the bandwidth scaling
-    det_H = np.linalg.det(H)
-    bi_kde = (1 / (n * np.sqrt(det_H))) * kde_sum
-    
-    bi_kde_values.append(bi_kde)
+    diff = N_matrix[n_idx] - N_matrix
+    squared_distance = np.einsum('ij,jk,ik->i', diff, H_inv, diff)
+    bi_kde_values.append(normalization * np.exp(-0.5 * squared_distance).sum())
+
+bi_kde_values = np.asarray(bi_kde_values)
+
+# SciPy supports the same full covariance matrix and Silverman bandwidth as H.
+kde = gaussian_kde(N_matrix.T, bw_method='silverman')
+scipy_kde_values = kde(N_matrix.T)
+absolute_difference = np.abs(bi_kde_values - scipy_kde_values)
+print("Maximum absolute difference between manual and SciPy KDE:", absolute_difference.max())
+print("Manual and SciPy KDE agree:", np.allclose(bi_kde_values, scipy_kde_values, rtol=1e-10, atol=1e-12))
+print("Silverman bandwidth factor (dimensionless):", kde.factor)
+print("Shared bandwidth covariance matrix H (wind speed, temperature):\n", H)
 
 # Test the bi-variable KDE calculation for the first few data points
 print("Bi-variable KDE results (first 5 data points of wind speed and temperature at 50m):")
@@ -149,22 +151,52 @@ for idx in range(min(5, len(bi_kde_values), len(N_matrix))):
     wind_speed_value, temperature_value = N_matrix[idx]
     print(
         f"  Point {idx}: Wind speed = {wind_speed_value:.6f} m/s, "
-        f"Temperature = {temperature_value:.6f} °C, KDE = {bi_kde_values[idx]:.6e}"
+        f"Temperature = {temperature_value:.6f} °C, "
+        f"Manual KDE = {bi_kde_values[idx]:.6e}, SciPy KDE = {scipy_kde_values[idx]:.6e}"
     )
 
-# With this function we can now try to create a 2D KDE plot for wind speed and temperature at 50m height
-#for a better understanding we can also plot the raw data points of wind speed and temperature at 50m height 
-#on the same plot as the KDE results
+# Animate individual normalized Gaussian kernels, not the sum over all points.
+# Their covariance H is shared, so only their centers change between frames.
+animation_points = N_matrix[:25]
+padding = 4 * np.sqrt(np.diag(H))
+x_limits = (animation_points[:, 0].min() - padding[0], animation_points[:, 0].max() + padding[0])
+y_limits = (animation_points[:, 1].min() - padding[1], animation_points[:, 1].max() + padding[1])
+kernel_x, kernel_y = np.meshgrid(
+    np.linspace(*x_limits, 150), np.linspace(*y_limits, 150)
+)
+kernel_positions = np.dstack((kernel_x, kernel_y))
+kernel_peak = 1 / (2 * np.pi * np.sqrt(np.linalg.det(H)))
+kernel_levels = np.linspace(0, kernel_peak, 12)
+fig, ax = plt.subplots(figsize=(8, 6))
+color_scale = plt.cm.ScalarMappable(norm=mcolors.Normalize(0, kernel_peak), cmap='viridis')
+fig.colorbar(color_scale, ax=ax, label='Individual kernel PDF [1 / ((m/s) * °C)]')
+
+def update(frame):
+    single_point = animation_points[frame]
+    kernel_pdf = multivariate_normal.pdf(kernel_positions, mean=single_point, cov=H)
+    ax.clear()
+    ax.contourf(kernel_x, kernel_y, kernel_pdf, levels=kernel_levels, cmap='viridis', alpha=0.8)
+    ax.scatter(N_matrix[:, 0], N_matrix[:, 1], c='blue', alpha=0.15, s=3, label='Data points')
+    ax.scatter(single_point[0], single_point[1], c='red', s=50, label='Kernel center')
+    ax.set_xlim(x_limits)
+    ax.set_ylim(y_limits)
+    ax.set_xlabel('Wind Speed at 50m (m/s)')
+    ax.set_ylabel('Temperature at 50m (°C)')
+    ax.set_title(
+        f'Individual Gaussian kernel: point {frame + 1} of {len(animation_points)}\n'
+        f'Wind speed = {single_point[0]:.3f} m/s, Temperature = {single_point[1]:.3f} °C'
+    )
+    ax.legend()
+
+ani = animation.FuncAnimation(fig, update, frames=len(animation_points), interval=500, repeat=False)
+ani.save('kernel_orientation.gif', writer='pillow', fps=2)
+print("Saved kernel_orientation.gif")
+plt.show()
+
 
 # Create a 2D KDE plot for wind speed and temperature at 50m height
-from scipy.stats import gaussian_kde
-
-# Stack the data for KDE input
 wind_speed = ds_m2_filtered['Avg Avg Wind Speed @ 50m [m/s]']
 temperature = ds_m2_filtered['Avg Temperature @ 50m [deg C]']
-
-data = np.vstack([wind_speed, temperature])
-kde = gaussian_kde(data, bw_method='silverman')
 
 # Create a grid for evaluation
 wind_speed_grid = np.linspace(wind_speed.min(), wind_speed.max(), 100)
@@ -201,7 +233,13 @@ csv_data = pd.DataFrame({
     'Date Time (UTC)': date_time,
     'Temperature at 50m (°C)': temperature,
     'Wind Speed at 50m (m/s)': wind_speed,
-    'KDE': bi_kde_values
+    'KDE': bi_kde_values,
+    'SciPy KDE': scipy_kde_values,
+    'KDE absolute difference': absolute_difference,
+    'Silverman bandwidth factor': kde.factor,
+    'H wind speed variance': H[0, 0],
+    'H wind speed-temperature covariance': H[0, 1],
+    'H temperature variance': H[1, 1]
 })
 
 csv_data.to_csv('2024_wind_temp_kde_50m.csv', index=False)
