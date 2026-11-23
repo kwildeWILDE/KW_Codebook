@@ -142,8 +142,6 @@ scipy_kde_values = kde(N_matrix.T)
 absolute_difference = np.abs(bi_kde_values - scipy_kde_values)
 print("Maximum absolute difference between manual and SciPy KDE:", absolute_difference.max())
 print("Manual and SciPy KDE agree:", np.allclose(bi_kde_values, scipy_kde_values, rtol=1e-10, atol=1e-12))
-print("Silverman bandwidth factor (dimensionless):", kde.factor)
-print("Shared bandwidth covariance matrix H (wind speed, temperature):\n", H)
 
 # Test the bi-variable KDE calculation for the first few data points
 print("Bi-variable KDE results (first 5 data points of wind speed and temperature at 50m):")
@@ -153,45 +151,49 @@ for idx in range(min(5, len(bi_kde_values), len(N_matrix))):
         f"  Point {idx}: Wind speed = {wind_speed_value:.6f} m/s, "
         f"Temperature = {temperature_value:.6f} °C, "
         f"Manual KDE = {bi_kde_values[idx]:.6e}, SciPy KDE = {scipy_kde_values[idx]:.6e}"
+        f"Silverman H value = {kde.covariance} "
     )
 
-# Animate individual normalized Gaussian kernels, not the sum over all points.
-# Their covariance H is shared, so only their centers change between frames.
-animation_points = N_matrix[:25]
-padding = 4 * np.sqrt(np.diag(H))
-x_limits = (animation_points[:, 0].min() - padding[0], animation_points[:, 0].max() + padding[0])
-y_limits = (animation_points[:, 1].min() - padding[1], animation_points[:, 1].max() + padding[1])
-kernel_x, kernel_y = np.meshgrid(
-    np.linspace(*x_limits, 150), np.linspace(*y_limits, 150)
-)
-kernel_positions = np.dstack((kernel_x, kernel_y))
-kernel_peak = 1 / (2 * np.pi * np.sqrt(np.linalg.det(H)))
-kernel_levels = np.linspace(0, kernel_peak, 12)
-fig, ax = plt.subplots(figsize=(8, 6))
-color_scale = plt.cm.ScalarMappable(norm=mcolors.Normalize(0, kernel_peak), cmap='viridis')
-fig.colorbar(color_scale, ax=ax, label='Individual kernel PDF [1 / ((m/s) * °C)]')
+# With this function we can now try to create a 2D KDE plot for wind speed and temperature at 50m height
+#for a better understanding we can also plot the raw data points of wind speed and temperature at 50m height 
+#on the same plot as the KDE results
+##
+# Create a 2D plot for the orientation of the kernel looks like for a single data point
+#Make an anumated gif going through the individual data points to visualize the kernel orientation 
 
-def update(frame):
-    single_point = animation_points[frame]
-    kernel_pdf = multivariate_normal.pdf(kernel_positions, mean=single_point, cov=H)
-    ax.clear()
-    ax.contourf(kernel_x, kernel_y, kernel_pdf, levels=kernel_levels, cmap='viridis', alpha=0.8)
-    ax.scatter(N_matrix[:, 0], N_matrix[:, 1], c='blue', alpha=0.15, s=3, label='Data points')
-    ax.scatter(single_point[0], single_point[1], c='red', s=50, label='Kernel center')
-    ax.set_xlim(x_limits)
-    ax.set_ylim(y_limits)
-    ax.set_xlabel('Wind Speed at 50m (m/s)')
-    ax.set_ylabel('Temperature at 50m (°C)')
-    ax.set_title(
-        f'Individual Gaussian kernel: point {frame + 1} of {len(animation_points)}\n'
-        f'Wind speed = {single_point[0]:.3f} m/s, Temperature = {single_point[1]:.3f} °C'
-    )
-    ax.legend()
+# single_point = N_matrix[0]
+# diff = single_point - N_matrix
+# squared_distance = np.einsum('ij,jk,ik->i', diff, H_inv, diff)
+# single_point_kde = normalization * np.exp(-0.5 * squared_distance).sum()
 
-ani = animation.FuncAnimation(fig, update, frames=len(animation_points), interval=500, repeat=False)
-ani.save('kernel_orientation.gif', writer='pillow', fps=2)
-print("Saved kernel_orientation.gif")
-plt.show()
+# plt.figure(figsize=(6, 6))
+# # plt.scatter(N_matrix[:, 0], N_matrix[:, 1], c='blue', alpha=0.3, s=3, label='Data Points')
+# # plt.scatter(single_point[0], single_point[1], c='red', s=50, label='Single Point')
+# # plt.title(f'Kernel Orientation for Single Data Point\nKDE Value = {single_point_kde:.6e}')
+# # plt.suptitle(f'Temperature @ 50 m = {single_point[1]:.6f} °C, Wind Speed @ 50 m = {single_point[0]:.6f} m/s')
+# # plt.xlabel('Wind Speed at 50m (m/s)')
+# # plt.ylabel('Temperature at 50m (°C)')
+
+# def update(frame):
+#     single_point = N_matrix[frame]
+#     diff = single_point - N_matrix
+#     squared_distance = np.einsum('ij,jk,ik->i', diff, H_inv, diff)
+#     single_point_kde = normalization * np.exp(-0.5 * squared_distance).sum()
+
+#     plt.clf()
+#     plt.scatter(N_matrix[:, 0], N_matrix[:, 1], c='blue', alpha=0.3, s=3, label='Data Points')
+#     plt.scatter(single_point[0], single_point[1], c='red', s=50, label='Single Point')
+#     plt.title(f'Kernel Orientation for Single Data Point\nKDE Value = {single_point_kde:.6e}')
+#     plt.suptitle(f'Temperature @ 50 m = {single_point[1]:.6f} °C, Wind Speed @ 50 m = {single_point[0]:.6f} m/s')
+#     plt.xlabel('Wind Speed at 50m (m/s)')
+#     plt.ylabel('Temperature at 50m (°C)')
+#     plt.legend()
+
+# ani = animation.FuncAnimation(plt.gcf(), update, frames=len(N_matrix), repeat=False)
+# # ani.save('kernel_orientation.gif', writer='imagemagick', fps=2)
+
+# plt.legend()
+# plt.show()
 
 
 # Create a 2D KDE plot for wind speed and temperature at 50m height
@@ -224,23 +226,108 @@ import matplotlib.pyplot as plt
 # Extract wind speed and temperature for plotting
 wind_speed = N_matrix[:, 0]
 temperature = N_matrix[:, 1]
+###################################################################
+# On the same plot make a subplots of the timeseries for wind speed at 50 m, temperature at 50 m, and KDE values
+# with datetime (UTC) indexing and conditional formatting for KDE values
+
+# Ensure the data is sorted by datetime_utc and get the datetime index
+datetime_utc = ds_m2_filtered['datetime_utc'].values
+wind_speed = ds_m2_filtered['Avg Avg Wind Speed @ 50m [m/s]'].values
+temperature = ds_m2_filtered['Avg Temperature @ 50m [deg C]'].values
+kde_line_values = bi_kde_values  # Use the KDE values calculated for each data point
+
+# Calculate which months have the lowest and highest KDE values
+ds_m2_filtered_sorted = ds_m2_filtered.copy()
+ds_m2_filtered_sorted['kde_value'] = bi_kde_values
+ds_m2_filtered_sorted['month'] = pd.to_datetime(ds_m2_filtered_sorted['datetime_utc']).dt.month
+ds_m2_filtered_sorted['month_name'] = pd.to_datetime(ds_m2_filtered_sorted['datetime_utc']).dt.strftime('%B')
+
+monthly_kde_mean = ds_m2_filtered_sorted.groupby(['month', 'month_name'])['kde_value'].mean()
+month_highest_kde = monthly_kde_mean.idxmax()[1]  # Get month name
+month_lowest_kde = monthly_kde_mean.idxmin()[1]   # Get month name
+max_kde = monthly_kde_mean.max()
+min_kde = monthly_kde_mean.min()
+
+print(f"Month with highest mean KDE value: {month_highest_kde} ({max_kde:.6e})")
+print(f"Month with lowest mean KDE value: {month_lowest_kde} ({min_kde:.6e})")
+
+# Create figure with subplots
+fig, (ax1, ax2, ax3) = plt.subplots(3, 1, figsize=(14, 10))
+
+# Subplot 1: Wind Speed at 50m
+ax1.plot(datetime_utc, wind_speed, color='blue', label='Wind Speed at 50m', linewidth=1)
+ax1.set_ylabel('Wind Speed (m/s)', fontsize=11)
+ax1.set_title('Time Series: Wind Speed, Temperature, and KDE Values at 50m Height (2024)', fontsize=12, fontweight='bold')
+ax1.legend(loc='upper left')
+ax1.grid(True, alpha=0.3)
+ax1.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+ax1.xaxis.set_major_locator(mdates.MonthLocator())
+
+# Subplot 2: Temperature at 50m
+ax2.plot(datetime_utc, temperature, color='red', label='Temperature at 50m', linewidth=1)
+ax2.set_ylabel('Temperature (°C)', fontsize=11)
+ax2.legend(loc='upper left')
+ax2.grid(True, alpha=0.3)
+ax2.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+ax2.xaxis.set_major_locator(mdates.MonthLocator())
+
+# Subplot 3: KDE Values with Smooth Gradient Conditional Formatting
+# Normalize KDE values to 0-1 range for color mapping
+kde_min = kde_line_values.min()
+kde_max = kde_line_values.max()
+kde_normalized = (kde_line_values - kde_min) / (kde_max - kde_min)
+
+# Use RdYlGn colormap for smooth gradient from red (low) to yellow (medium) to green (high)
+cmap = plt.cm.RdYlGn
+norm = mcolors.Normalize(vmin=0, vmax=1)
+
+# Plot segments with smooth gradient coloring
+for i in range(len(datetime_utc) - 1):
+    # Get color from colormap based on normalized KDE value
+    color = cmap(kde_normalized[i])
+    
+    # Plot line segment
+    ax3.plot(datetime_utc[i:i+2], kde_line_values[i:i+2], color=color, linewidth=2.5)
+
+ax3.set_ylabel('KDE Value', fontsize=11)
+ax3.set_xlabel('Month (UTC)', fontsize=11)
+ax3.legend(['KDE Values (Smooth Gradient)'], loc='upper left')
+ax3.grid(True, alpha=0.3)
+ax3.xaxis.set_major_formatter(mdates.DateFormatter('%b'))
+ax3.xaxis.set_major_locator(mdates.MonthLocator())
+
+# Add colorbar to show gradient scale
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
+sm.set_array([])
+cbar = plt.colorbar(sm, ax=ax3, orientation='horizontal', pad=0.2)
+cbar.set_label('Normalized KDE Value (0=Low, 1=High)', fontsize=10)
+
+# Align all subplots to have the same x-axis limits
+x_min = datetime_utc.min()
+x_max = datetime_utc.max()
+ax1.set_xlim(x_min, x_max)
+ax2.set_xlim(x_min, x_max)
+ax3.set_xlim(x_min, x_max)
+
+plt.tight_layout()
+plt.show()
+
+
+
 ###########################################################
-# create a .csv file of the date, time (UTC), Temperature, and Wind Speed at 50m, and KDE values for each data point
-import pandas as pd
+# # create a .csv file of the date, time (UTC), Temperature, and Wind Speed at 50m, and KDE values for each data point
+# import pandas as pd
 
-date_time = ds_m2_filtered['datetime_utc']
-csv_data = pd.DataFrame({
-    'Date Time (UTC)': date_time,
-    'Temperature at 50m (°C)': temperature,
-    'Wind Speed at 50m (m/s)': wind_speed,
-    'KDE': bi_kde_values,
-    'SciPy KDE': scipy_kde_values,
-    'KDE absolute difference': absolute_difference,
-    'Silverman bandwidth factor': kde.factor,
-    'H wind speed variance': H[0, 0],
-    'H wind speed-temperature covariance': H[0, 1],
-    'H temperature variance': H[1, 1]
-})
+# date_time = ds_m2_filtered['datetime_utc']
+# csv_data = pd.DataFrame({
+#     'Date Time (UTC)': date_time,
+#     'Temperature at 50m (°C)': temperature,
+#     'Wind Speed at 50m (m/s)': wind_speed,
+#     'KDE': bi_kde_values,
+#     'SciPy KDE': scipy_kde_values,
+#     'KDE absolute difference': absolute_difference,
+#     "Bandwidth matrix H (wind speed, temperature)": [H[0, 0], H[0, 1], H[1, 0], H[1, 1]]
+# })
 
-csv_data.to_csv('2024_wind_temp_kde_50m.csv', index=False)
+# csv_data.to_csv('2024_wind_temp_kde_50m.csv', index=False)
 
