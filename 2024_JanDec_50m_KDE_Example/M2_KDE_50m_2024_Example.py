@@ -142,6 +142,8 @@ scipy_kde_values = kde(N_matrix.T)
 absolute_difference = np.abs(bi_kde_values - scipy_kde_values)
 print("Maximum absolute difference between manual and SciPy KDE:", absolute_difference.max())
 print("Manual and SciPy KDE agree:", np.allclose(bi_kde_values, scipy_kde_values, rtol=1e-10, atol=1e-12))
+print("Silverman bandwidth factor (dimensionless):", kde.factor)
+print("Shared bandwidth covariance matrix H (wind speed, temperature):\n", H)
 
 # Test the bi-variable KDE calculation for the first few data points
 print("Bi-variable KDE results (first 5 data points of wind speed and temperature at 50m):")
@@ -151,49 +153,45 @@ for idx in range(min(5, len(bi_kde_values), len(N_matrix))):
         f"  Point {idx}: Wind speed = {wind_speed_value:.6f} m/s, "
         f"Temperature = {temperature_value:.6f} °C, "
         f"Manual KDE = {bi_kde_values[idx]:.6e}, SciPy KDE = {scipy_kde_values[idx]:.6e}"
-        f"Silverman H value = {kde.covariance} "
     )
 
-# With this function we can now try to create a 2D KDE plot for wind speed and temperature at 50m height
-#for a better understanding we can also plot the raw data points of wind speed and temperature at 50m height 
-#on the same plot as the KDE results
-##
-# Create a 2D plot for the orientation of the kernel looks like for a single data point
-#Make an anumated gif going through the individual data points to visualize the kernel orientation 
+# Animate individual normalized Gaussian kernels, not the sum over all points.
+# Their covariance H is shared, so only their centers change between frames.
+animation_points = N_matrix[:25]
+padding = 4 * np.sqrt(np.diag(H))
+x_limits = (animation_points[:, 0].min() - padding[0], animation_points[:, 0].max() + padding[0])
+y_limits = (animation_points[:, 1].min() - padding[1], animation_points[:, 1].max() + padding[1])
+kernel_x, kernel_y = np.meshgrid(
+    np.linspace(*x_limits, 150), np.linspace(*y_limits, 150)
+)
+kernel_positions = np.dstack((kernel_x, kernel_y))
+kernel_peak = 1 / (2 * np.pi * np.sqrt(np.linalg.det(H)))
+kernel_levels = np.linspace(0, kernel_peak, 12)
+fig, ax = plt.subplots(figsize=(8, 6))
+color_scale = plt.cm.ScalarMappable(norm=mcolors.Normalize(0, kernel_peak), cmap='viridis')
+fig.colorbar(color_scale, ax=ax, label='Individual kernel PDF [1 / ((m/s) * °C)]')
 
-# single_point = N_matrix[0]
-# diff = single_point - N_matrix
-# squared_distance = np.einsum('ij,jk,ik->i', diff, H_inv, diff)
-# single_point_kde = normalization * np.exp(-0.5 * squared_distance).sum()
+def update(frame):
+    single_point = animation_points[frame]
+    kernel_pdf = multivariate_normal.pdf(kernel_positions, mean=single_point, cov=H)
+    ax.clear()
+    ax.contourf(kernel_x, kernel_y, kernel_pdf, levels=kernel_levels, cmap='viridis', alpha=0.8)
+    ax.scatter(N_matrix[:, 0], N_matrix[:, 1], c='blue', alpha=0.15, s=3, label='Data points')
+    ax.scatter(single_point[0], single_point[1], c='red', s=50, label='Kernel center')
+    ax.set_xlim(x_limits)
+    ax.set_ylim(y_limits)
+    ax.set_xlabel('Wind Speed at 50m (m/s)')
+    ax.set_ylabel('Temperature at 50m (°C)')
+    ax.set_title(
+        f'Individual Gaussian kernel: point {frame + 1} of {len(animation_points)}\n'
+        f'Wind speed = {single_point[0]:.3f} m/s, Temperature = {single_point[1]:.3f} °C'
+    )
+    ax.legend()
 
-# plt.figure(figsize=(6, 6))
-# # plt.scatter(N_matrix[:, 0], N_matrix[:, 1], c='blue', alpha=0.3, s=3, label='Data Points')
-# # plt.scatter(single_point[0], single_point[1], c='red', s=50, label='Single Point')
-# # plt.title(f'Kernel Orientation for Single Data Point\nKDE Value = {single_point_kde:.6e}')
-# # plt.suptitle(f'Temperature @ 50 m = {single_point[1]:.6f} °C, Wind Speed @ 50 m = {single_point[0]:.6f} m/s')
-# # plt.xlabel('Wind Speed at 50m (m/s)')
-# # plt.ylabel('Temperature at 50m (°C)')
-
-# def update(frame):
-#     single_point = N_matrix[frame]
-#     diff = single_point - N_matrix
-#     squared_distance = np.einsum('ij,jk,ik->i', diff, H_inv, diff)
-#     single_point_kde = normalization * np.exp(-0.5 * squared_distance).sum()
-
-#     plt.clf()
-#     plt.scatter(N_matrix[:, 0], N_matrix[:, 1], c='blue', alpha=0.3, s=3, label='Data Points')
-#     plt.scatter(single_point[0], single_point[1], c='red', s=50, label='Single Point')
-#     plt.title(f'Kernel Orientation for Single Data Point\nKDE Value = {single_point_kde:.6e}')
-#     plt.suptitle(f'Temperature @ 50 m = {single_point[1]:.6f} °C, Wind Speed @ 50 m = {single_point[0]:.6f} m/s')
-#     plt.xlabel('Wind Speed at 50m (m/s)')
-#     plt.ylabel('Temperature at 50m (°C)')
-#     plt.legend()
-
-# ani = animation.FuncAnimation(plt.gcf(), update, frames=len(N_matrix), repeat=False)
-# # ani.save('kernel_orientation.gif', writer='imagemagick', fps=2)
-
-# plt.legend()
-# plt.show()
+ani = animation.FuncAnimation(fig, update, frames=len(animation_points), interval=500, repeat=False)
+ani.save('kernel_orientation.gif', writer='pillow', fps=2)
+print("Saved kernel_orientation.gif")
+plt.show()
 
 
 # Create a 2D KDE plot for wind speed and temperature at 50m height
@@ -326,7 +324,10 @@ plt.show()
 #     'KDE': bi_kde_values,
 #     'SciPy KDE': scipy_kde_values,
 #     'KDE absolute difference': absolute_difference,
-#     "Bandwidth matrix H (wind speed, temperature)": [H[0, 0], H[0, 1], H[1, 0], H[1, 1]]
+#     'Silverman bandwidth factor': kde.factor,
+#     'H wind speed variance': H[0, 0],
+#     'H wind speed-temperature covariance': H[0, 1],
+#     'H temperature variance': H[1, 1]
 # })
 
 # csv_data.to_csv('2024_wind_temp_kde_50m.csv', index=False)
